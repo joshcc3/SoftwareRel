@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts, TupleSections #-}
 
-module HSRTool.Parser.CoreParser(rp, h, getFileContents, getFilePaths, getRes, stripws, ws,
+module HSRTool.Parser.Utils(rp, h, getFileContents, getFilePaths, getRes, stripws, ws,
        			 valid_chars, chs, FileContent, Dep, Deps, parseLine,
 			 nos, digits, parseSeq, oneOfParsers, toStringParser,
 			 manyTill') where
