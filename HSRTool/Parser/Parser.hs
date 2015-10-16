@@ -1,71 +1,92 @@
+{-# LANGUAGE FlexibleContexts #-}
 module HSRTool.Parser.Parser where
 
+import Data.List
+import Control.Applicative hiding ((<|>), many)
 import HSRTool.Parser.Utils
 import Text.Parsec
+import HSRTool.Parser.Types
+import Data.Functor.Identity
 
 -- type Strm = Stream String Identity Char
 type P u a = Parsec String u a
 
-data Program id = Program {
-      pVarDecls :: [VarDecl id],
-      pPDecls :: [ProcedureDecl id]
-}
 
-data VarDecl id = VarDecl {
-      varId :: id 
-}
+{-
+1 + 2*3
+1*2 + 3
+(1+2)*3
+1 - 2*3
+1 - (2 + 4)
+1 - 2 + 3
+1+2*3/5-3+5
+(1+(2*(3/5))-3)+5
++,*,/,-,+
+1+2-3/5*3+5
+(1+2)>((3^5)/3)*5
 
-data ProcedureDecl id = PDecl {
-      pId :: id,
-      pFParams :: [FormalParam id],
-      pPrepost :: [PrePost id],
-      pStmts :: [Stmt id],
-      pExpr :: [(Expr id)]
-}
+1+2*3^2/2+3
+1+(2*(3^2))+3
 
-data FormalParam id = FParam { fID :: id }
-data PrePost id = PPReq (Expr id) | PPEns (Expr id)
-data Stmt id = SVarDecl (VarDecl id) | 
-            SAssignStmt (AssignStmt id) |
-            SAssertStmt (AssertStmt id) |
-            SAssumeStmt (AssumeStmt id) |
-            SHavocStmt (HavocStmt id) |
-            SIfStmt (IfStmt id)
-data AssignStmt id = AssignStmt { 
-      assgnID :: id,
-      assgnExpr :: (Expr id) 
-}
-
-data AssertStmt id = AssertStmt {
-      assrtExpr :: (Expr id)
-}
-
-data AssumeStmt id = AssumStmt {
-      assmeExpr :: (Expr id)
-}
-
-data HavocStmt id = HavocStmt {
-      hID :: id
-}
-            
-data IfStmt id = IfStmt {
-      ifExpr :: Expr id,
-      ifThenB :: Stmt id,
-      isElseB :: Stmt id
-}
-
-data Expr id = EShortIf (Expr id) (Expr id) (Expr id) | BinOp id | EUnOp id | Lit Integer | EID id | EResult | EOld id
-
-data BinOp id = (Expr id) :|| (Expr id) | (Expr id) :&& (Expr id) | (Expr id) :| (Expr id) | (Expr id) :^ (Expr id) | 
-             (Expr id) :& (Expr id) | (Expr id) :== (Expr id) | (Expr id) :!= (Expr id) | (Expr id) :< (Expr id) | 
-             (Expr id) :<= (Expr id) | (Expr id) :> (Expr id) | (Expr id) :>= (Expr id) | (Expr id) :<< (Expr id) | 
-             (Expr id) :>> (Expr id) | (Expr id) :+ (Expr id) | (Expr id) :- (Expr id) | (Expr id) :* (Expr id) | 
-             (Expr id) :/ (Expr id) | (Expr id) :% (Expr id)
-
-data UnOp id = (::+) (Expr id) | (::-) (Expr id) | (::!) (Expr id) | (::~) (Expr id)
+(1+(2*(3/5))-3)+5
+(1+2)-((3/5)*3)+5
 
 
+-}
+data ExpTok id = TLit Int | TOp String | TID id | TResult | TOld id deriving (Eq, Ord, Show, Read)
+
+-- tokenise :: Stream String Identity Char => P u (ExpTok String)
+tokenise = foldl1 (<|>) (number:ops ++ [tid, tres, told])
+    where
+      number = (TLit . read) <$> (many1 digit <* many space)
+      tid = TID <$> ident
+      ident = many1 valid_chars
+      tres :: Stream String Identity Char => P u (ExpTok String)
+      tres = TResult <$ string "\\result"
+      told = TOld <$> ident
+      oper c = TOp <$> (string c <* many space)
+      ops = map oper ["||", "&&", "|", "^", "&", "==", "!=", "<", "<=", ">", ">=", "<<", ">>", "+",
+                      "-", "*", "/", "%", "~", "!", "(", ")"]
+
+infixToExp :: ExpTok String -> Expr String
+infixToExp es = toExpr . reverse . toPostfix . map flipParens . reverse
+    where 
+      flipParens (TOp "(") = TOp ")"
+      flipParens (TOp ")") = TOp "("
+      flipParens x = x
+      toPostfix = unfoldr f . (++ ["("]) . push ")"
+      f (TOp ")":os, st, b) = Just (os, TOp ")":st)
+      f (TOp o:os, st, b) = case popWhile o st of
+                              (pre, st') -> (os, st', TOp o:reverse pre++b)
+      f (TOp "(":os, st, b) = case popWhile o st of
+                              (pre, st') -> (os, st', reverse pre++b)
+      popWhile o (x, []) = (x, [])
+      popWhile o (x, o':os) | leq o o' = popWhile (o':x, os)
+                            | otherwise = (x, o':os)
+      leq = undefined
+      toExpr = undefined
 
 
+type St = ([ExpTok String])
 
+simple2P = f <$> (numberP <* op '*') <*> numberP <*> (op '+' *> numberP)
+    where 
+      f x y z = EBinOp (EBinOp (Lit x :* Lit y) :+ Lit z)
+
+
+simpleP = f <$> (numberP <* op '+') <*> numberP <*> (op '*' *> numberP)
+    where 
+      f x y z = EBinOp (Lit x :+ EBinOp (Lit y :* Lit z))
+
+
+numberP :: Stream String Identity Char => P u Int
+numberP = read <$> (many1 digit <* many space)
+
+op c = char c <* many space
+
+oneOpP :: Stream String Identity Char => Char -> P u (Expr String)
+oneOpP c = f <$> numberP <*> rest
+    where 
+      rest = Just <$> (op c *> oneOpP c) <|> return Nothing
+      f x r = maybe (Lit x) (\v -> EBinOp (Lit x :+ v)) r
 
