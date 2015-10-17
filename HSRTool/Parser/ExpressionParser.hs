@@ -29,21 +29,28 @@ leftAssoc
 -}
 
 tokeniseExpr :: Stream String Identity Char => P u [InToken String]
-tokeniseExpr = many1 . foldl1 (<|>) . map h $ number:lparen:rparen:tid:tres:told:ops
+tokeniseExpr = g 0
     where
-      h x = x <* many space
+      g 0 = (try rparen *> fail "")
+            <|> ((:) <$> try lparen <*> g 1)
+            <|> ((:) <$> oPoss <*> g 0)
+            <|> return []
+      g n = ((:) <$> try rparen <*> g (n-1)) 
+            <|> ((:) <$> try lparen <*> g (n+1))
+            <|> ((:) <$> oPoss <*> g n)
+      oPoss = foldl1 (<|>) (number:tres:tid:told:ops)
       number :: Stream String Identity Char => P u (InToken String)
-      number = (ITLit . read) <$> many1 digit
-      tres = ITResult <$ try (string "\\result")
-      tid = ITID <$> ident
-      lparen = ITLParen <$ char '('
-      rparen = ITRParen <$ char ')'
-      told = ITOld <$> (string "\\old" *> many space *> string "(" *>
-             many space *> ident <* many space <* string ")")
-      oper c = (ITOp . mapOps) <$> try (string c)
+      number = many space *> ((ITLit . read) <$> many1 digit) <* many space
+      tres = many space *> (ITResult <$ try (string "\\result")) <* many space
+      tid =  many space *> (ITID <$> ident) <* many space
+      lparen = many space *> (ITLParen <$ char '(') <* many space
+      rparen = many space *> (ITRParen <$ char ')') <* many space
+      told = many space *> (ITOld <$> ((string "\\old") *> many space *> string "(" *>
+             many space *> ident <* many space <* string ")")) <* many space
+      oper c = many space *> ((ITOp . mapOps) <$> try (string c)) <* many space
       ops = map oper charOps
 
-charOps =  [":", "?", "||", "&&", "~", "!", "==", "!=", "<", "<=", ">", ">=", "<<", ">>", "+", "-", "*", "/", "%", "^", "|", "&"]
+charOps =  [":", "?", "||", "&&", "~", "!", "==", "!=",  "<<", ">>", "<=", "<", ">=", ">", "+", "-", "*", "/", "%", "^", "|", "&"]
 mapOps "*" = Mul
 mapOps "/" = Div
 mapOps "+" = Add
@@ -68,14 +75,18 @@ mapOps "?" = SIfCond
 mapOps ":" = SIfAlt
 
 -- Need to add better error messages here
-parseExpr :: P u (Expr String)
-parseExpr = tokeniseExpr >>= toRPN >>= return . head . fst . go []
+-- parseExpr :: P u (Expr String)
+parseExpr = tokeniseExpr >>= toRPN >>= fmap (head . fst) . go []
     where
-      go l [] = (l, [])
+      go l [] = return (l, [])
       go l (OutVal i:r) = go (ELit i:l) r
       go l (OutVar id:r) = go (EID id:l) r
       go l (OutResult:r) = go (EResult:l) r
       go l (OutOld id:r) = go (EOld id:l) r
+      go [e1] (OutOp op:r) = either
+                             (\be -> fail "Bad Expr")
+                             (\ue -> go (EUnOp (ue e1):[]) r)
+                             (optype $ opInfo op) 
       go (e2:e1:es) (OutOp op:r)
           = either 
             (\be -> go (EBinOp (be e1 e2):es) r)
