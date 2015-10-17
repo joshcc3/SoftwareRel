@@ -85,5 +85,5 @@ ident = (:) <$> chs <*> many (chs <|> digit)
     where 
       chs = lower <|> upper <|> char '_'
 
-bar x = try ((:) <$> x <*> (try (string commaT *> bar x) <|> return []))
-        <|> return []
+bar x = try ((:) <$> (x <* many space) <*> (try (string commaT *> many space *> bar x) <|> ([] <$ many space)))
+        <|> ([] <$ many space)

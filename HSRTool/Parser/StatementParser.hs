@@ -14,15 +14,15 @@ statementParser =
     SAssignStmt <$> try assignStmt <|> 
     SAssertStmt <$> try assertStmt <|> 
     SAssumeStmt <$> try assumeStmt <|> 
-    SHavocStmt <$> try havocStmt <|> 
+    SHavocStmt <$> try havocStmt <|>
     SIfStmt <$> try ifStmt <|> 
-    blockStmt
+    SBlockStmt <$> blockStmt
 
---varDecl :: ParsecT String u Identity (VarDecl id)
+varDecl :: ParsecT String u Identity (VarDecl String)
 varDecl = VarDecl <$> 
-          (string intK *> 
-           many space *> 
-           ident <* string semicolonT)
+          (string intK *> many space *> 
+           ident 
+           <* string semicolonT)
 
 assignStmt = do
   i <- ident
@@ -58,27 +58,27 @@ havocStmt = do
   string semicolonT
   many space
   return (HavocStmt i)
+--ifStmt :: Stream String Identity Char => Parsec String u String
 ifStmt = do
   string ifK
   many space
-  string lparenT
-  many space
   e <- parseExpr
-  many space
-  string rparenT
   many space
   b <- blockStmt
   many space
-  string lparenT 
-  many space
-  string elseK
-  many space
-  b' <- blockStmt
+  b' <- try (do
+        string elseK
+        many space
+        b' <- blockStmt
+        many space
+        return (Just b)
+      ) <|> return Nothing
   return (IfStmt e b b')
 blockStmt = do
   string ocurlyT
   many space
-  s <- statementParser
+  s <- many (many space *> statementParser <* many space)
   many space
   string ccurlyT
   return s
+
