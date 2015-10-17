@@ -10,32 +10,36 @@ import Control.Monad.State
 import HSRTool.Parser.Utils
 import Data.Bifunctor
 
-data ExpTok id = TLit Int | TOp String | TID id | TLParen | TRParen | TResult | TOld id deriving (Eq, Ord, Show, Read)
-
 type P u a = Parsec String u a
 
-tokenise = many1 $ foldl1 (<|>) (number:ops ++ [tid, tres, told])
-    where
-      number = (TLit . read) <$> (many1 digit <* many space)
-      tid = TID <$> ident
-      ident = many1 valid_chars
-      tres :: Stream String Identity Char => P u (ExpTok String)
-      tres = TResult <$ string "\\result"
-      told = TOld <$> ident
-      oper c = TOp <$> (string c <* many space)
-      ops = map oper ["||", "&&", "|", "^", "&", "==", "!=", "<", "<=", ">", ">=", "<<", ">>", "+",
-                      "-", "*", "/", "%", "~", "!", "(", ")"]
+{-
+To add new tokens, must modify:
+tokenise
+InToken
+processToken
+modify OutToken
+modify show instance of OutToken
 
-tokenise' :: Stream String Identity Char => P u [InToken String]
-tokenise' = many1 . foldl1 (<|>) . map h $ (number:lparen:rparen:tid:ops) --  ++ [tres, told])
+To add new mathematical operators, must modify:
+data Op
+mapOps
+opInfo
+leftAssoc
+-}
+
+tokenise :: Stream String Identity Char => P u [InToken String]
+tokenise = many1 . foldl1 (<|>) . map h $ number:lparen:rparen:tid:tres:told:ops -- , told])
     where
       h x = x <* many space
       number :: Stream String Identity Char => P u (InToken String)
       number = (ITLit . read) <$> many1 digit
+      tres = ITResult <$ try (string "\\result")
       tid = ITID <$> ident
       lparen = ITLParen <$ char '('
       rparen = ITRParen <$ char ')'
       ident = (:) <$> chs <*> many (chs <|> digit)
+      told = ITOld <$> (string "\\old" *> many space *> string "(" *>
+             many space *> ident <* many space <* string ")")
       chs = lower <|> upper <|> char '_'
       --tres :: Stream String Identity Char => P u InToken
       --tres = TResult <$ string "\\result"
@@ -67,10 +71,10 @@ mapOps "||" = LOr
 mapOps "?" = SIfCond
 mapOps ":" = SIfAlt
 
-chain s = first show (rp tokenise' s) >>= toRPN
+chain s = first show (rp tokenise s) >>= toRPN
 
-data InToken id = ITID id | ITOp Op | ITLit Int | ITLParen | ITRParen deriving (Show)
-data OutToken id = OutOp Op | OutVal Int | OutVar id
+data InToken id = ITID id | ITOp Op | ITLit Int | ITLParen | ITRParen | ITResult | ITOld id deriving (Show)
+data OutToken id = OutOp Op | OutVal Int | OutVar id | OutResult | OutOld id
 data StackElem = StOp Op | Paren deriving (Show)
 data Op = Mul | Div | Add | Sub | Exp | Mod | LShift | RShift |
           BitXOr | BitAnd | BitOr | GrEq | Gr | Lt | LtEq | NEq | Eq | Not | BitNot |
@@ -85,7 +89,9 @@ instance Show (OutToken String) where
     show (OutOp x) = snd $ opInfo x
     show (OutVal v) = show v
     show (OutVar v) = v
- 
+    show OutResult = "\\result"
+    show (OutOld id) = "old(" ++ id ++ ")"
+
 opInfo = \case
     LNot -> (15, "!")
     BitNot -> (15, "~")
@@ -126,7 +132,9 @@ processToken = \case
     ITLParen    -> pushParen
     ITRParen    -> pushTillParen
     ITID id -> pushVar id
- 
+    ITResult -> pushResult
+    ITOld x -> pushOld x
+
 pushTillParen :: RPNComp id ()
 pushTillParen = use _2 >>= \case 
     []     -> lift (Left "Unmatched right parenthesis")
@@ -146,7 +154,13 @@ pushOp o = use _2 >>= \case
  
 pushVal :: Int -> RPNComp id ()
 pushVal n = _1 %= (OutVal n:)
- 
+
+pushResult :: RPNComp id ()
+pushResult = _1 %= (OutResult:)
+
+pushOld :: id -> RPNComp id ()
+pushOld id = _1 %= (OutOld id:)
+
 pushVar :: id -> RPNComp id ()
 pushVar id = _1 %= (OutVar id:)
  
