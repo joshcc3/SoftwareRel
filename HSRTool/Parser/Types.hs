@@ -14,7 +14,7 @@ data ProcedureDecl id = PDecl {
       pFParams :: [FormalParam id],
       pPrepost :: [PrePost id],
       pStmts :: [Stmt id],
-      pExpr :: [(Expr id)]
+      pExpr :: Expr id
 } deriving (Eq, Ord, Show, Read)
 
 data FormalParam id = FParam { fID :: id } deriving (Eq, Ord, Show, Read)
@@ -24,7 +24,8 @@ data Stmt id = SVarDecl (VarDecl id) |
             SAssertStmt (AssertStmt id) |
             SAssumeStmt (AssumeStmt id) |
             SHavocStmt (HavocStmt id) |
-            SIfStmt (IfStmt id) deriving (Eq, Ord, Show, Read)
+            SIfStmt (IfStmt id) |
+            SBlockStmt [Stmt id] deriving (Eq, Ord, Show, Read)
 
 data AssignStmt id = AssignStmt { 
       assgnID :: id,
@@ -35,7 +36,7 @@ data AssertStmt id = AssertStmt {
       assrtExpr :: (Expr id)
 } deriving (Eq, Ord, Show, Read)
 
-data AssumeStmt id = AssumStmt {
+data AssumeStmt id = AssumeStmt {
       assmeExpr :: (Expr id)
 } deriving (Eq, Ord, Show, Read)
 
@@ -45,16 +46,16 @@ data HavocStmt id = HavocStmt {
             
 data IfStmt id = IfStmt {
       ifExpr :: Expr id,
-      ifThenB :: Stmt id,
-      isElseB :: Stmt id
+      ifThenB :: [Stmt id],
+      ifElseB :: Maybe [Stmt id]
 } deriving (Eq, Ord, Show, Read)
 
-data Expr id = EShortIf (Expr id) (Expr id) (Expr id) | EBinOp (BinOp id) | EUnOp (UnOp id) | Lit Int | EID id | EResult | EOld id deriving (Eq, Ord, Show, Read)
+data Expr id = EShortIf (Expr id) (Expr id) (Expr id) | EBinOp (BinOp id) | EUnOp (UnOp id) | ELit Int | EID id | EResult | EOld id deriving (Eq, Ord, Show, Read)
 
 data BinOp id = (Expr id) :|| (Expr id) | (Expr id) :&& (Expr id) | (Expr id) :| (Expr id) | (Expr id) :^ (Expr id) | 
              (Expr id) :& (Expr id) | (Expr id) :== (Expr id) | (Expr id) :!= (Expr id) | (Expr id) :< (Expr id) | 
              (Expr id) :<= (Expr id) | (Expr id) :> (Expr id) | (Expr id) :>= (Expr id) | (Expr id) :<< (Expr id) | 
              (Expr id) :>> (Expr id) | (Expr id) :+ (Expr id) | (Expr id) :- (Expr id) | (Expr id) :* (Expr id) | 
-             (Expr id) :/ (Expr id) | (Expr id) :% (Expr id) deriving (Eq, Ord, Show, Read)
+             (Expr id) :/ (Expr id) | (Expr id) :% (Expr id)  | (Expr id) :? (Expr id)  | (Expr id) :?: (Expr id) deriving (Eq, Ord, Show, Read)
 
 data UnOp id = (::+) (Expr id) | (::-) (Expr id) | (::!) (Expr id) | (::~) (Expr id) deriving (Eq, Ord, Show, Read)
