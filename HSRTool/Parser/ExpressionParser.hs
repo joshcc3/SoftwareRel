@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase, FlexibleContexts, FlexibleInstances #-}
 
-module HSRTool.Parser.ExpressionParser where
+module HSRTool.Parser.ExpressionParser(parseExp) where
 
 import Control.Applicative hiding (many, (<|>))
 import Text.Parsec
@@ -8,6 +8,7 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.State
 import HSRTool.Parser.Utils
+import HSRTool.Parser.Types
 import Data.Bifunctor
 
 type P u a = Parsec String u a
@@ -71,7 +72,7 @@ mapOps "||" = LOr
 mapOps "?" = SIfCond
 mapOps ":" = SIfAlt
 
-chain s = first show (rp tokenise s) >>= toRPN
+parseExp s = first show (rp tokenise s) >>= toRPN >>= return . toExpr
 
 data InToken id = ITID id | ITOp Op | ITLit Int | ITLParen | ITRParen | ITResult | ITOld id deriving (Show)
 data OutToken id = OutOp Op | OutVal Int | OutVar id | OutResult | OutOld id
@@ -80,45 +81,53 @@ data Op = Mul | Div | Add | Sub | Exp | Mod | LShift | RShift |
           BitXOr | BitAnd | BitOr | GrEq | Gr | Lt | LtEq | NEq | Eq | Not | BitNot |
           LAnd | LOr | LNot | SIfCond | SIfAlt
           deriving (Show)
+
+data OpInfo id = OpInfo {
+      precedence :: Int,
+      symbol :: String,
+      optype :: Either (Expr id -> Expr id -> BinOp id) (Expr id -> UnOp id)
+}
+
 data Assoc = L | R deriving (Eq)
  
 type Env id = ([OutToken id], [StackElem])
 type RPNComp id = StateT (Env id) (Either String) 
  
 instance Show (OutToken String) where
-    show (OutOp x) = snd $ opInfo x
+    show (OutOp x) = symbol $ opInfo x
     show (OutVal v) = show v
     show (OutVar v) = v
     show OutResult = "\\result"
     show (OutOld id) = "old(" ++ id ++ ")"
 
+opInfo :: Op -> OpInfo id
 opInfo = \case
-    LNot -> (15, "!")
-    BitNot -> (15, "~")
-    Mul -> (14, "*")
-    Div -> (14, "/")
-    Mod -> (14, "%")
-    Add -> (13, "+")
-    Sub -> (13, "-")
-    LShift -> (12, "<<")
-    RShift -> (12, ">>")
-    Gr -> (10, ">")
-    Lt -> (10, "<")
-    GrEq -> (10, ">=")
-    LtEq -> (10, "<=")
-    NEq -> (9, "!=")
-    Eq -> (9, "==")
-    BitAnd -> (8, "&")
-    BitXOr -> (7, "^")
-    BitOr -> (6, "|")
-    LAnd -> (5, "&&")
-    LOr -> (4, "||")
-    SIfCond -> (3, "?")
-    SIfAlt -> (3, ":")
+    LNot -> OpInfo 15 "!" (Right (::!))
+    BitNot -> OpInfo 15 "~" (Right (::~))
+    Mul -> OpInfo 14 "*" (Left (:*))
+    Div -> OpInfo 14 "/" (Left (:/))
+    Mod -> OpInfo 14 "%" (Left (:%))
+    Add -> OpInfo 13 "+" (Left (:+))
+    Sub -> OpInfo 13 "-" (Left (:-))
+    LShift -> OpInfo 12 "<<" (Left (:<<))
+    RShift -> OpInfo 12 ">>" (Left (:>>))
+    Gr -> OpInfo 10 ">" (Left (:>))
+    Lt -> OpInfo 10 "<" (Left (:<))
+    GrEq -> OpInfo 10 ">=" (Left (:>=))
+    LtEq -> OpInfo 10 "<=" (Left (:<=))
+    NEq -> OpInfo 9 "!=" (Left (:!=))
+    Eq -> OpInfo 9 "==" (Left (:==))
+    BitAnd -> OpInfo 8 "&" (Left (:&))
+    BitXOr -> OpInfo 7 "^" (Left (:^))
+    BitOr -> OpInfo 6 "|" (Left (:|))
+    LAnd -> OpInfo 5 "&&" (Left (:&&))
+    LOr -> OpInfo 4 "||" (Left (:||))
+    SIfCond -> OpInfo 3 "?" (Left (:?))
+    SIfAlt -> OpInfo 3 ":" (Left (:?:))
     
     
 
-prec = fst . opInfo
+prec = precedence . opInfo
 leftAssoc LNot = False
 leftAssoc BitNot = False
 leftAssoc SIfCond = False
@@ -176,3 +185,16 @@ toRPN xs = evalStateT process ([],[])
           toOut (StOp o) = return $ OutOp o
           toOut Paren    = lift (Left "Unmatched left parenthesis")
 
+--toExpr :: [OutToken id] -> (Expr id, [OutToken id])
+toExpr = go []
+    where 
+      go l [] = (l, [])
+      go l (OutVal i:r) = go (ELit i:l) r
+      go l (OutVar id:r) = go (EID id:l) r
+      go l (OutResult:r) = go (EResult:l) r
+      go l (OutOld id:r) = go (EOld id:l) r
+      go (e2:e1:es) (OutOp op:r)
+           = either 
+            (\be -> go (EBinOp (be e1 e2):es) r)
+            (\ue -> go (EUnOp (ue e2):e1:es) r)
+            (optype $ opInfo op)

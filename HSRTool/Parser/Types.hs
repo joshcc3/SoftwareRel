@@ -49,12 +49,12 @@ data IfStmt id = IfStmt {
       isElseB :: Stmt id
 } deriving (Eq, Ord, Show, Read)
 
-data Expr id = EShortIf (Expr id) (Expr id) (Expr id) | EBinOp (BinOp id) | EUnOp (UnOp id) | Lit Int | EID id | EResult | EOld id deriving (Eq, Ord, Show, Read)
+data Expr id = EShortIf (Expr id) (Expr id) (Expr id) | EBinOp (BinOp id) | EUnOp (UnOp id) | ELit Int | EID id | EResult | EOld id deriving (Eq, Ord, Show, Read)
 
 data BinOp id = (Expr id) :|| (Expr id) | (Expr id) :&& (Expr id) | (Expr id) :| (Expr id) | (Expr id) :^ (Expr id) | 
              (Expr id) :& (Expr id) | (Expr id) :== (Expr id) | (Expr id) :!= (Expr id) | (Expr id) :< (Expr id) | 
              (Expr id) :<= (Expr id) | (Expr id) :> (Expr id) | (Expr id) :>= (Expr id) | (Expr id) :<< (Expr id) | 
              (Expr id) :>> (Expr id) | (Expr id) :+ (Expr id) | (Expr id) :- (Expr id) | (Expr id) :* (Expr id) | 
-             (Expr id) :/ (Expr id) | (Expr id) :% (Expr id) deriving (Eq, Ord, Show, Read)
+             (Expr id) :/ (Expr id) | (Expr id) :% (Expr id)  | (Expr id) :? (Expr id)  | (Expr id) :?: (Expr id) deriving (Eq, Ord, Show, Read)
 
 data UnOp id = (::+) (Expr id) | (::-) (Expr id) | (::!) (Expr id) | (::~) (Expr id) deriving (Eq, Ord, Show, Read)
