@@ -35,7 +35,7 @@ data AssertStmt id = AssertStmt {
       assrtExpr :: (Expr id)
 } deriving (Eq, Ord, Show, Read)
 
-data AssumeStmt id = AssumStmt {
+data AssumeStmt id = AssumeStmt {
       assmeExpr :: (Expr id)
 } deriving (Eq, Ord, Show, Read)
 

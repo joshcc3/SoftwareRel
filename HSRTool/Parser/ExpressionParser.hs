@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase, FlexibleContexts, FlexibleInstances #-}
 
-module HSRTool.Parser.ExpressionParser(parseExp) where
+module HSRTool.Parser.ExpressionParser(parseExpr) where
 
 import Control.Applicative hiding (many, (<|>))
 import Text.Parsec
@@ -28,8 +28,8 @@ opInfo
 leftAssoc
 -}
 
-tokenise :: Stream String Identity Char => P u [InToken String]
-tokenise = many1 . foldl1 (<|>) . map h $ number:lparen:rparen:tid:tres:told:ops -- , told])
+tokeniseExpr :: Stream String Identity Char => P u [InToken String]
+tokeniseExpr = many1 . foldl1 (<|>) . map h $ number:lparen:rparen:tid:tres:told:ops
     where
       h x = x <* many space
       number :: Stream String Identity Char => P u (InToken String)
@@ -38,13 +38,8 @@ tokenise = many1 . foldl1 (<|>) . map h $ number:lparen:rparen:tid:tres:told:ops
       tid = ITID <$> ident
       lparen = ITLParen <$ char '('
       rparen = ITRParen <$ char ')'
-      ident = (:) <$> chs <*> many (chs <|> digit)
       told = ITOld <$> (string "\\old" *> many space *> string "(" *>
              many space *> ident <* many space <* string ")")
-      chs = lower <|> upper <|> char '_'
-      --tres :: Stream String Identity Char => P u InToken
-      --tres = TResult <$ string "\\result"
-      --told = TOld <$> ident
       oper c = (ITOp . mapOps) <$> try (string c)
       ops = map oper charOps
 
@@ -72,7 +67,21 @@ mapOps "||" = LOr
 mapOps "?" = SIfCond
 mapOps ":" = SIfAlt
 
-parseExp s = first show (rp tokenise s) >>= toRPN >>= return . toExpr
+-- Need to add better error messages here
+parseExpr :: P u (Expr String)
+parseExpr = tokeniseExpr >>= toRPN >>= return . head . fst . go []
+    where
+      go l [] = (l, [])
+      go l (OutVal i:r) = go (ELit i:l) r
+      go l (OutVar id:r) = go (EID id:l) r
+      go l (OutResult:r) = go (EResult:l) r
+      go l (OutOld id:r) = go (EOld id:l) r
+      go (e2:e1:es) (OutOp op:r)
+          = either 
+            (\be -> go (EBinOp (be e1 e2):es) r)
+            (\ue -> go (EUnOp (ue e2):e1:es) r)
+            (optype $ opInfo op)
+
 
 data InToken id = ITID id | ITOp Op | ITLit Int | ITLParen | ITRParen | ITResult | ITOld id deriving (Show)
 data OutToken id = OutOp Op | OutVal Int | OutVar id | OutResult | OutOld id
@@ -177,24 +186,12 @@ pushParen :: RPNComp id ()
 pushParen = _2 %= (Paren:)
  
 --Run StateT
-toRPN :: [InToken id] -> Either String [OutToken id]
-toRPN xs = evalStateT process ([],[])
-    where process = mapM_ processToken xs
+toRPN :: [InToken id] -> P u [OutToken id]
+toRPN xs = g (evalStateT process ([],[]))
+    where g (Left x) = fail x
+          g (Right x) = return x
+          process = mapM_ processToken xs
                       >> get >>= \(a,b) -> (reverse a++) <$> (mapM toOut b)
           toOut :: StackElem -> RPNComp id (OutToken id)
           toOut (StOp o) = return $ OutOp o
           toOut Paren    = lift (Left "Unmatched left parenthesis")
-
---toExpr :: [OutToken id] -> (Expr id, [OutToken id])
-toExpr = go []
-    where 
-      go l [] = (l, [])
-      go l (OutVal i:r) = go (ELit i:l) r
-      go l (OutVar id:r) = go (EID id:l) r
-      go l (OutResult:r) = go (EResult:l) r
-      go l (OutOld id:r) = go (EOld id:l) r
-      go (e2:e1:es) (OutOp op:r)
-           = either 
-            (\be -> go (EBinOp (be e1 e2):es) r)
-            (\ue -> go (EUnOp (ue e2):e1:es) r)
-            (optype $ opInfo op)
