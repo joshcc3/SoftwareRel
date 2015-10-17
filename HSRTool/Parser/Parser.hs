@@ -49,20 +49,21 @@ tokenise = foldl1 (<|>) (number:ops ++ [tid, tres, told])
                       "-", "*", "/", "%", "~", "!", "(", ")"]
 
 infixToExp :: ExpTok String -> Expr String
-infixToExp es = toExpr . reverse . toPostfix . map flipParens . reverse
+infixToExp = undefined -- toExpr . reverse . toPostfix . map flipParens . reverse
     where 
       flipParens (TOp "(") = TOp ")"
       flipParens (TOp ")") = TOp "("
       flipParens x = x
-      toPostfix = unfoldr f . (++ ["("]) . push ")"
+      toPostfix = undefined -- unfoldr f . (++ ["("]) . push ")"
       f (TOp ")":os, st, b) = Just (os, TOp ")":st)
+      f (TOp "(":os, st, b) = undefined -- case popWhile "(" st of
+                              -- (pre, st') -> (os, st', reverse pre++b)
       f (TOp o:os, st, b) = case popWhile o st of
-                              (pre, st') -> (os, st', TOp o:reverse pre++b)
-      f (TOp "(":os, st, b) = case popWhile o st of
-                              (pre, st') -> (os, st', reverse pre++b)
+                              _ -> undefined -- (pre, st') -> (os, st', TOp o:reverse pre++b)
       popWhile o (x, []) = (x, [])
-      popWhile o (x, o':os) | leq o o' = popWhile (o':x, os)
+      popWhile o (x, o':os) | leq o o' = popWhile o (o':x, os)
                             | otherwise = (x, o':os)
+      push = undefined
       leq = undefined
       toExpr = undefined
 
