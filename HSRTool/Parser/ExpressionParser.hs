@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, FlexibleContexts #-}
+{-# LANGUAGE LambdaCase, FlexibleContexts, FlexibleInstances #-}
 
 module HSRTool.Parser.ExpressionParser where
 
@@ -27,18 +27,20 @@ tokenise = many1 $ foldl1 (<|>) (number:ops ++ [tid, tres, told])
                       "-", "*", "/", "%", "~", "!", "(", ")"]
 
 tokenise' :: Stream String Identity Char => P u [InToken String]
-tokenise' = many1 $ foldl1 (<|>) (number:lparen:rparen:ops) --  ++ [tid, tres, told])
+tokenise' = many1 . foldl1 (<|>) . map h $ (number:lparen:rparen:tid:ops) --  ++ [tres, told])
     where
+      h x = x <* many space
       number :: Stream String Identity Char => P u (InToken String)
-      number = (ITLit . read) <$> (many1 digit <* many space)
-      -- tid = TID <$> ident
+      number = (ITLit . read) <$> many1 digit
+      tid = ITID <$> ident
       lparen = ITLParen <$ char '('
       rparen = ITRParen <$ char ')'
-      ident = many1 valid_chars
+      ident = (:) <$> chs <*> many (chs <|> digit)
+      chs = lower <|> upper <|> char '_'
       --tres :: Stream String Identity Char => P u InToken
       --tres = TResult <$ string "\\result"
       --told = TOld <$> ident
-      oper c = (ITOp . mapOps) <$> (try (string c) <* many space)
+      oper c = (ITOp . mapOps) <$> try (string c)
       ops = map oper charOps
 
 charOps =  [":", "?", "||", "&&", "~", "!", "==", "!=", "<", "<=", ">", ">=", "<<", ">>", "+", "-", "*", "/", "%", "^", "|", "&"]
@@ -67,8 +69,8 @@ mapOps ":" = SIfAlt
 
 chain s = first show (rp tokenise' s) >>= toRPN
 
-data InToken id = ITOp Op | ITLit Int | ITLParen | ITRParen deriving (Show)
-data OutToken = OutOp Op | OutVal Int
+data InToken id = ITID id | ITOp Op | ITLit Int | ITLParen | ITRParen deriving (Show)
+data OutToken id = OutOp Op | OutVal Int | OutVar id
 data StackElem = StOp Op | Paren deriving (Show)
 data Op = Mul | Div | Add | Sub | Exp | Mod | LShift | RShift |
           BitXOr | BitAnd | BitOr | GrEq | Gr | Lt | LtEq | NEq | Eq | Not | BitNot |
@@ -76,12 +78,13 @@ data Op = Mul | Div | Add | Sub | Exp | Mod | LShift | RShift |
           deriving (Show)
 data Assoc = L | R deriving (Eq)
  
-type Env = ([OutToken], [StackElem])
-type RPNComp = StateT Env (Either String) 
+type Env id = ([OutToken id], [StackElem])
+type RPNComp id = StateT (Env id) (Either String) 
  
-instance Show OutToken where
+instance Show (OutToken String) where
     show (OutOp x) = snd $ opInfo x
     show (OutVal v) = show v
+    show (OutVar v) = v
  
 opInfo = \case
     LNot -> (15, "!")
@@ -116,21 +119,22 @@ leftAssoc SIfCond = False
 leftAssoc SIfAlt = False
 leftAssoc _   = True
  
-processToken :: InToken String -> RPNComp ()
+processToken :: InToken id -> RPNComp id ()
 processToken = \case
     (ITLit z) -> pushVal z
     (ITOp op) -> pushOp op
     ITLParen    -> pushParen
     ITRParen    -> pushTillParen
+    ITID id -> pushVar id
  
-pushTillParen :: RPNComp ()
+pushTillParen :: RPNComp id ()
 pushTillParen = use _2 >>= \case 
     []     -> lift (Left "Unmatched right parenthesis")
     (s:st) -> case s of
          StOp o -> _1 %= (OutOp o:) >> _2 %= tail >> pushTillParen
          Paren  -> _2 %= tail
  
-pushOp :: Op -> RPNComp ()
+pushOp :: Op -> RPNComp id ()
 pushOp o = use _2 >>= \case
     [] -> _2 .= [StOp o]
     (s:st) -> case s of 
@@ -140,18 +144,21 @@ pushOp o = use _2 >>= \case
                      else _2 %= (StOp o:) 
         Paren     -> _2 %= (StOp o:)
  
-pushVal :: Int -> RPNComp ()
+pushVal :: Int -> RPNComp id ()
 pushVal n = _1 %= (OutVal n:)
  
-pushParen :: RPNComp ()
+pushVar :: id -> RPNComp id ()
+pushVar id = _1 %= (OutVar id:)
+ 
+pushParen :: RPNComp id ()
 pushParen = _2 %= (Paren:)
  
 --Run StateT
-toRPN :: [InToken String] -> Either String [OutToken]
+toRPN :: [InToken id] -> Either String [OutToken id]
 toRPN xs = evalStateT process ([],[])
     where process = mapM_ processToken xs
                       >> get >>= \(a,b) -> (reverse a++) <$> (mapM toOut b)
-          toOut :: StackElem -> RPNComp OutToken
+          toOut :: StackElem -> RPNComp id (OutToken id)
           toOut (StOp o) = return $ OutOp o
           toOut Paren    = lift (Left "Unmatched left parenthesis")
 
