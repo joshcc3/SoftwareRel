@@ -49,7 +49,10 @@ ocurlyT = "{"
 ccurlyT = "}"
 equalsT = "="
 commaT = ","
-tokens = [semicolonT, lparenT, rparenT, ocurlyT, ccurlyT, equalsT, commaT]
+commentT = "//"
+oMultiLineCT = "/*"
+cMultiLineCT = "*/"
+tokens = [semicolonT, lparenT, rparenT, ocurlyT, ccurlyT, equalsT, commaT, commentT, oMultiLineCT, cMultiLineCT]
 
 type FileContent = String
 type Dep = String
