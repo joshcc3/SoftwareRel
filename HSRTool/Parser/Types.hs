@@ -14,7 +14,7 @@ data ProcedureDecl id = PDecl {
       pFParams :: [FormalParam id],
       pPrepost :: [PrePost id],
       pStmts :: [Stmt id],
-      pExpr :: [(Expr id)]
+      pExpr :: Expr id
 } deriving (Eq, Ord, Show, Read)
 
 data FormalParam id = FParam { fID :: id } deriving (Eq, Ord, Show, Read)
