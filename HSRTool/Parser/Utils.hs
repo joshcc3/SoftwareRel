@@ -30,7 +30,17 @@ ifK = "if"
 elseK :: String
 elseK = "else"
 
-keywords = [intK, assertK, assumeK, havocK, ifK, elseK]
+returnK :: String
+returnK = "return"
+
+requiresK ::String
+requiresK = "requires"
+
+ensuresK :: String
+ensuresK = "ensures"
+
+keywords :: [String]
+keywords = [intK, assertK, assumeK, havocK, ifK, elseK, returnK, requiresK, ensuresK]
 
 semicolonT = ";"
 lparenT = "("
@@ -38,7 +48,8 @@ rparenT = ")"
 ocurlyT = "{"
 ccurlyT = "}"
 equalsT = "="
-tokens = [semicolonT, lparenT, rparenT, ocurlyT, ccurlyT, equalsT]
+commaT = ","
+tokens = [semicolonT, lparenT, rparenT, ocurlyT, ccurlyT, equalsT, commaT]
 
 type FileContent = String
 type Dep = String
@@ -71,3 +82,5 @@ ident = (:) <$> chs <*> many (chs <|> digit)
     where 
       chs = lower <|> upper <|> char '_'
 
+bar x = try ((:) <$> x <*> (try (string commaT *> bar x) <|> return []))
+        <|> return []
