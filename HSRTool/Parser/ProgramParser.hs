@@ -11,7 +11,6 @@ import HSRTool.Parser.Types
 import Data.Functor.Identity
 import Text.Parsec
 
-
 programParser :: ParsecT String u Identity (Program String)
 programParser = 
     Program <$> 
