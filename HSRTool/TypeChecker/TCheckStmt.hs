@@ -7,8 +7,7 @@ import Control.Monad.State
 import Control.Monad.Writer
 import HSRTool.TypeChecker.TCheckExpr
 
-checkTypeStmt :: Stmt String -> TypeChecker SCType
-checkTypeStmt (SVarDecl (VarDecl v)) = do
+checkVarDecl v = do
   s <- get
   let tInfo = typeInfo s
   maybe 
@@ -17,6 +16,9 @@ checkTypeStmt (SVarDecl (VarDecl v)) = do
      return SCUnit)
    (\_ -> tell ["Redeclaraion of variable within scope: " ++ v] >> return SCAny)
    (lkup tInfo v (scope s))
+
+checkTypeStmt :: Stmt String -> TypeChecker SCType
+checkTypeStmt (SVarDecl (VarDecl v)) = checkVarDecl v
 checkTypeStmt (SAssignStmt (AssignStmt id e)) = do
   st <- get
   let s = typeInfo st
