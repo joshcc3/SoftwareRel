@@ -10,10 +10,8 @@ import HSRTool.TypeChecker.TCheckStmt
 
 checkTypeProgram :: Program String -> TypeChecker SCType
 checkTypeProgram (Program vDecl pDecl) = do
-  newScope
   mapM_ (checkVarDecl . varId) vDecl
   mapM_ checkProcedureDecl pDecl
-  closeScope
   return SCUnit
 
 checkProcedureDecl p = do
