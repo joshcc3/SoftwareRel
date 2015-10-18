@@ -12,10 +12,11 @@ checkVarDecl v = do
   let tInfo = typeInfo s
   maybe 
    (do
-     put (s{typeInfo = tInfo { varMap = insert v SCInt (scope s) s}})
+     put (s{typeInfo = 
+            tInfo { varMap = insert (varMap tInfo) v SCInt (scope s)}})
      return SCUnit)
    (\_ -> tell ["Redeclaraion of variable within scope: " ++ v] >> return SCAny)
-   (lkup tInfo v (scope s))
+   (lkup (varMap tInfo) v (scope s))
 
 checkTypeStmt :: Stmt String -> TypeChecker SCType
 checkTypeStmt (SVarDecl (VarDecl v)) = checkVarDecl v
@@ -39,11 +40,12 @@ checkTypeStmt (SAssumeStmt (AssumeStmt e)) = do
   t <- checkTypeExpr e
   return t
 checkTypeStmt (SHavocStmt (HavocStmt id)) = do
-  s <- (typeInfo <$> get)
+  st <- get
+  let s = typeInfo st
   maybe 
    (tell ["Undeclared variable: " ++ id] >> return SCAny)
    return
-   (varMap s id)
+   (lkup (varMap s) id (scope st))
 checkTypeStmt (SIfStmt (IfStmt b t e)) = do
   st <- get
   b' <- checkTypes (b, SCBool)
