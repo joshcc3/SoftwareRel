@@ -15,10 +15,12 @@ checkTypeProgram (Program vDecl pDecl) = do
   return SCUnit
 
 checkProcedureDecl p = do
+  newScope
   mapM_ checkfParams (pFParams p)
   mapM_ checkPP (pPrepost p)
   mapM_ checkTypeStmt (pStmts p)
   checkTypeExpr (pExpr p)
+  closeScope
   
 checkfParams fp = checkVarDecl (fID fp)
 checkPP (PPReq e) = checkTypeExpr e
