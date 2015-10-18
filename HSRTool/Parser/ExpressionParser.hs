@@ -47,10 +47,10 @@ tokeniseExpr = g 0
       rparen = many space *> (ITRParen <$ char ')') <* many space
       told = many space *> (ITOld <$> ((string "\\old") *> many space *> string "(" *>
              many space *> ident <* many space <* string ")")) <* many space
-      oper c = many space *> ((ITOp . mapOps) <$> try (string c)) <* many space
+      oper c = try $ many space *> ((ITOp . mapOps) <$> string c) <* many space
       ops = map oper charOps
 
-charOps =  [":", "?", "||", "&&", "~", "!", "==", "!=",  "<<", ">>", "<=", "<", ">=", ">", "+", "-", "*", "/", "%", "^", "|", "&"]
+charOps = [":", "?", "||", "&&", "~", "!=" , "!", "==", "<<", ">>", "<=", "<", ">=", ">", "+", "-", "*", "/", "%", "^", "|", "&"]
 mapOps "*" = Mul
 mapOps "/" = Div
 mapOps "+" = Add
