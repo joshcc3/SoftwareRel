@@ -31,7 +31,7 @@ checkTypeExpr (EID x) = do
   st <- get
   let s = typeInfo st
   maybe (tell ["Undefined variable: " ++ x] >> return SCAny)
-        return $ lkup varMap s x (scope st)
+        return $ lkup (varMap s) x (scope st)
 checkTypeExpr EResult = return SCUnit
 checkTypeExpr (EOld _) = return SCUnit
 
