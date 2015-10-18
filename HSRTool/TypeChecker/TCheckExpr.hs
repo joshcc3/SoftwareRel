@@ -28,7 +28,7 @@ mapToTypes (EBinOp b) = toTypesBinOp b
 mapToTypes (EUnOp u) = undefined -- toTypesUnOp u
 mapToTypes (ELit _) = return SCInt
 mapToTypes (EID x) = do
-  s <- lift get
+  s <- typeInfo <$> lift get
   maybe (tell ["Undefined variable: " ++ x] >> return SCAny)
         return $ varMap s x
 mapToTypes EResult = return SCUnit
