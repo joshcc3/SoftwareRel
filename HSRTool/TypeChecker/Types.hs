@@ -8,6 +8,7 @@ import qualified Data.Map as M
 import Data.Maybe
 import Control.Monad.Writer
 import Control.Monad.State
+import Data.Monoid
 
 data SCType = SCUnit | SCInt | SCBool | SCUnFunc SCType
             | SCBinFunc SCType SCType | SCAny
@@ -38,4 +39,7 @@ insert m var t sc = M.insertWith const sc
                     (M.insertWith (++) var [t] 
                           (maybe M.empty id (M.lookup sc m)))
                     m
-lkup m var scope = M.lookup scope m >>= M.lookup var >>= listToMaybe
+lkup m var scope = getFirst res
+    where
+      f s = First (M.lookup s m >>= M.lookup var >>= listToMaybe)
+      res = foldl1 (<>) (map f [scope,scope-1..0])

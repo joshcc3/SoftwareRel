@@ -18,11 +18,7 @@ checkProcedureDecl p = do
   mapM_ checkfParams (pFParams p)
   mapM_ checkPP (pPrepost p)
   mapM_ checkTypeStmt (pStmts p)
-  mt <- checkTypes (pExpr p, SCInt)
-  maybe
-   (tell ["Return doesn't match for: " ++ pId p] >> return SCAny)
-   return
-   mt
+  checkTypeExpr (pExpr p)
   
 checkfParams fp = checkVarDecl (fID fp)
 checkPP (PPReq e) = checkTypeExpr e

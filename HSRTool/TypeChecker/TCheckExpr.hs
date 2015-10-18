@@ -32,25 +32,30 @@ checkTypeExpr (EID x) = do
   let s = typeInfo st
   maybe (tell ["Undefined variable: " ++ x] >> return SCAny)
         return $ lkup (varMap s) x (scope st)
-checkTypeExpr EResult = return SCUnit
-checkTypeExpr (EOld _) = return SCUnit
-
+checkTypeExpr EResult = return SCInt
+checkTypeExpr (EOld x) = do
+  st <- get
+  let s = typeInfo st
+  maybe (tell ["Undefined variable: " ++ x] >> return SCAny)
+        return $ lkup (varMap s) x (scope st)
 toTypesBinOp (x :|| y) = do
-  m <- check2Types (x, SCBool) (y, SCBool)
-  maybe (return SCAny) (\_ -> return SCBool) m
-
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCBool
 toTypesBinOp (x :&& y) = do
-  m <- check2Types (x, SCBool) (y, SCBool)
-  maybe (return SCAny) (\_ -> return SCBool) m
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCBool
 toTypesBinOp (x :| y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCInt
 toTypesBinOp (x :^ y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
 toTypesBinOp (x :& y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
 toTypesBinOp (x :== y) = do
   tx <- checkTypeExpr x
   ty <- checkTypeExpr y
@@ -64,60 +69,72 @@ toTypesBinOp (x :!= y) = do
   then return SCBool
   else tell ["Types do not match in equals expression: " ++ show tx ++ " and " ++ show ty] >> return SCAny
 toTypesBinOp (x :< y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCBool
 toTypesBinOp (x :<= y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCBool
 toTypesBinOp (x :> y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCBool
 toTypesBinOp (x :>= y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCBool
 toTypesBinOp (x :<< y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCInt
 toTypesBinOp (x :>> y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCInt
 toTypesBinOp (x :+ y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCInt
 toTypesBinOp (x :- y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCInt
 toTypesBinOp (x :* y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCInt
 toTypesBinOp (x :/ y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCInt
 toTypesBinOp (x :% y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
+  return SCInt
 toTypesBinOp (x :? y) =  do
-  m <- check2Types (x, SCBool) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  checkTypeExpr y
 toTypesBinOp (x :?: y) = do
-  m <- check2Types (x, SCInt) (y, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  tx <- checkTypeExpr x
+  ty <- checkTypeExpr y
+  if tx == ty
+  then return tx
+  else tell ["Types do not match in equals expression: " ++ show tx ++ " and " ++ show ty] >> return SCAny
 toTypesUnOp ((::+) x) = do
-  m <- checkTypes (x, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  return SCInt
 toTypesUnOp ((::-) x) = do
-  m <- checkTypes (x, SCInt)
-  maybe (return SCAny) (\_ -> return SCInt) m
+  checkTypeExpr x
+  return SCInt
  -- Negated int literals are not currently parsed
 toTypesUnOp ((::!) x) = do
-  m <- checkTypes (x, SCBool)
-  maybe (return SCAny) (\_ -> return SCBool) m
-
-check2Types (a, t) (b, t') =
-  (liftA2 . liftA2) const (checkTypes (a, t)) (checkTypes (b, t'))
-
+  checkTypeExpr x
+  return SCBool
+{-
 checkTypes (a, t) = do
-  at <- checkTypeExpr a
-  if at /= t
-  then tell ["Could not match types: " ++ show at ++ " and " ++ show t] >> return Nothing
-  else return (Just t)
+  t' <- checkTypeExpr a
+  if t' == t
+  then return (Just t)
+  else tell ["Could not unify: " ++ show t' ++ ", " ++ show t] >> return Nothing
+-}
