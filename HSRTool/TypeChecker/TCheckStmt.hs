@@ -26,19 +26,12 @@ checkTypeStmt (SAssignStmt (AssignStmt id e)) = do
       sc = scope st
   maybe 
    (tell ["Undeclared variable: " ++ id] >> return SCAny)
-   (\t -> do
-     r <- checkTypes (e, t)
-     maybe (return SCAny) return r)
+   (\_ -> checkTypeExpr e)
    (lkup (varMap s) id sc)
 checkTypeStmt (SAssertStmt (AssertStmt e)) = do
-  mt <- checkTypes (e, SCBool)
-  maybe 
-   (tell ["Assert statement requires Bool"] >> return SCAny)
-   (\t -> return t)
-   mt
+  checkTypeExpr e
 checkTypeStmt (SAssumeStmt (AssumeStmt e)) = do
-  t <- checkTypeExpr e
-  return t
+  checkTypeExpr e
 checkTypeStmt (SHavocStmt (HavocStmt id)) = do
   st <- get
   let s = typeInfo st
@@ -48,10 +41,9 @@ checkTypeStmt (SHavocStmt (HavocStmt id)) = do
    (lkup (varMap s) id (scope st))
 checkTypeStmt (SIfStmt (IfStmt b t e)) = do
   st <- get
-  b' <- checkTypes (b, SCBool)
+  checkTypeExpr b
   newScope
   let s = typeInfo st
-  maybe (tell ["If condition should be a bool"]) (\_ -> return ()) b'
   ts <- mapM checkTypeStmt t
   closeScope
   newScope
@@ -68,7 +60,7 @@ newScope = do
   st <- get
   let stack = scopeStack st
   if null stack
-  then put $ st { scope = 0, scopeStack = [] }
+  then put $ st { scope = 1, scopeStack = [0] }
   else put $ st { scope = scope st + 1, scopeStack = scope st:stack }
 
 closeScope = do

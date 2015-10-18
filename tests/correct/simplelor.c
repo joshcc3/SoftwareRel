@@ -7,11 +7,11 @@ int foo() {
     int i; int j;
     int k;
     int l;
-
+    
     l = k ? 1 : 1;
     
     k = l || i;
-
+    
     i = k || y || (i || j);
 
     j = i || i;
