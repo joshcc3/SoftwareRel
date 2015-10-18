@@ -6,8 +6,8 @@ import HSRTool.Parser.Types
 import Control.Monad.Writer
 import Control.Monad.State
 
-mapToTypes :: Expr String -> WriterT [String] (State TInfo) SCType
-mapToTypes (EShortIf b x y) = do
+checkTypeExpr :: Expr String -> TypeChecker SCType
+checkTypeExpr (EShortIf b x y) = do
   c1 <- cond1
   c2 <- cond2
   if c1
@@ -35,20 +35,20 @@ mapToTypes EResult = return SCUnit
 mapToTypes (EOld _) = return SCUnit
 
 toTypesBinOp (x :|| y) = do
-  m <- checkTypes (x, SCBool) (y, SCBool)
+  m <- check2Types (x, SCBool) (y, SCBool)
   maybe (return SCAny) (\_ -> return SCBool) m
 
 toTypesBinOp (x :&& y) = do
-  m <- checkTypes (x, SCBool) (y, SCBool)
+  m <- check2Types (x, SCBool) (y, SCBool)
   maybe (return SCAny) (\_ -> return SCBool) m
 toTypesBinOp (x :| y) = do
-  m <- checkTypes (x, SCInt) (y, SCInt)
+  m <- check2Types (x, SCInt) (y, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
 toTypesBinOp (x :^ y) = do
-  m <- checkTypes (x, SCInt) (y, SCInt)
+  m <- check2Types (x, SCInt) (y, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
 toTypesBinOp (x :& y) = do
-  m <- checkTypes (x, SCInt) (y, SCInt)
+  m <- check2Types (x, SCInt) (y, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
 toTypesBinOp (x :== y) = undefined
 toTypesBinOp (x :!= y) = undefined -- fTppB
@@ -58,53 +58,47 @@ toTypesBinOp (x :> y) = undefined -- fTIIB
 toTypesBinOp (x :>= y) = undefined -- fTIIB
 
 toTypesBinOp (x :<< y) = do
-  m <- checkTypes (x, SCInt) (y, SCInt)
+  m <- check2Types (x, SCInt) (y, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
 toTypesBinOp (x :>> y) = do
-  m <- checkTypes (x, SCInt) (y, SCInt)
+  m <- check2Types (x, SCInt) (y, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
 toTypesBinOp (x :+ y) = do
-  m <- checkTypes (x, SCInt) (y, SCInt)
+  m <- check2Types (x, SCInt) (y, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
 toTypesBinOp (x :- y) = do
-  m <- checkTypes (x, SCInt) (y, SCInt)
+  m <- check2Types (x, SCInt) (y, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
 toTypesBinOp (x :* y) = do
-  m <- checkTypes (x, SCInt) (y, SCInt)
+  m <- check2Types (x, SCInt) (y, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
 toTypesBinOp (x :/ y) = do
-  m <- checkTypes (x, SCInt) (y, SCInt)
+  m <- check2Types (x, SCInt) (y, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
 toTypesBinOp (x :% y) = do
-  m <- checkTypes (x, SCInt) (y, SCInt)
+  m <- check2Types (x, SCInt) (y, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
 toTypesBinOp (x :? y) =  do
-  m <- checkTypes (x, SCBool) (y, SCInt)
+  m <- check2Types (x, SCBool) (y, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
 toTypesBinOp (x :?: y) = do
-  m <- checkTypes (x, SCInt) (y, SCInt)
+  m <- check2Types (x, SCInt) (y, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
 toTypesUnOp ((::+) x) = do
-  m <- checkTypes' (x, SCInt)
+  m <- checkTypes (x, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
 toTypesUnOp ((::-) x) = do
-  m <- checkTypes' (x, SCInt)
+  m <- checkTypes (x, SCInt)
   maybe (return SCAny) (\_ -> return SCInt) m
  -- Negated int literals are not currently parsed
 toTypesUnOp ((::!) x) = do
-  m <- checkTypes' (x, SCBool)
+  m <- checkTypes (x, SCBool)
   maybe (return SCAny) (\_ -> return SCBool) m
 
-checkTypes (a, t) (b, t') = do
-  at <- mapToTypes a
-  bt <- mapToTypes b
-  if at /= t
-  then tell ["Could not match types: " ++ show at ++ " and " ++ show t] >> return Nothing
-  else if bt /= t'
-       then tell ["Could not match types: " ++ show bt ++ " and " ++ show t'] >> return Nothing
-       else return (Just t)
+check2Types (a, t) (b, t') =
+  (liftA2 . liftA2) const (checkTypes (a, t)) (checkTypes (b, t'))
 
-checkTypes' (a, t) = do
+checkTypes (a, t) = do
   at <- mapToTypes a
   if at /= t
   then tell ["Could not match types: " ++ show at ++ " and " ++ show t] >> return Nothing

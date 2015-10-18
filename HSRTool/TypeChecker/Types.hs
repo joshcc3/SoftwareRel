@@ -4,11 +4,14 @@
 {-# LANGUAGE GADTs, DataKinds #-}
 
 module HSRTool.TypeChecker.Types where
-
+import Control.Monad.Writer
+import Control.Monad.State
 
 data SCType = SCUnit | SCInt | SCBool | SCUnFunc SCType
             | SCBinFunc SCType SCType | SCAny
             | SCTriFunc SCType SCType SCType SCType deriving (Ord, Show, Read)
+
+type TypeChecker t = WriterT [String] (State TInfo) t
 
 instance Eq SCType where
     SCAny == _ = True
@@ -21,4 +24,4 @@ data TInfo = TInfo {
       varMap :: VarId -> Maybe SCType
 }
 
-
+insert = undefined
