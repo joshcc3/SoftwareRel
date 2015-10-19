@@ -1,7 +1,6 @@
 module HSRTool.Parser.CGExpr where
 import HSRTool.Parser.Types
 
-
 evalBinOp :: (Show a) => (BinOp a) -> String
 evalBinOp (expr1 :|| expr2) = "(|| " ++ evalExpr expr1 ++ " " ++ evalExpr expr2 ++ ")"
 evalBinOp (expr1 :&& expr2) = "(and " ++ evalExpr expr1 ++ " " ++ evalExpr expr2 ++ ")"
