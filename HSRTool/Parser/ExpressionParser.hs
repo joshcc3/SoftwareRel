@@ -4,7 +4,7 @@ module HSRTool.Parser.ExpressionParser(parseExpr) where
 
 import Control.Applicative hiding (many, (<|>))
 import Text.Parsec
-import Control.Lens
+import Control.Lens hiding ((:>), (:<))
 import Control.Monad
 import Control.Monad.State
 import HSRTool.Parser.Utils
@@ -206,3 +206,6 @@ toRPN xs = g (evalStateT process ([],[]))
           toOut :: StackElem -> RPNComp id (OutToken id)
           toOut (StOp o) = return $ OutOp o
           toOut Paren    = lift (Left "Unmatched left parenthesis")
+
+exp1 = ELit 1
+exp2 = EBinOp (ELit 10 :+ ELit 12)

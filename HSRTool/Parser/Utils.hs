@@ -68,6 +68,7 @@ valid_chars = oneOf chs <|> alphaNum
 stripws = reverse . dropWhile (flip elem ws) . reverse
 ws = [' ',  '\t']
 
+nos :: String -> Bool
 nos = all digits
 digits x = x >= '0' && x <= '9'
 
