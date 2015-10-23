@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveFunctor, TemplateHaskell #-}
 
-module HSRTool.CodeGen.SMTForm where
+module HSRTool.CodeGen.SMTForm(fromSSA) where
 
 import Data.List (nub)
 import qualified Data.Set as Set
@@ -87,7 +87,7 @@ fromSSA ssa =
 
 -- ([BoolSMT], [BoolSMT], IdSMT) is (assignments, assertions, smt idents)
 partitionSSA :: SSAAlt NewId NewExprSSA
-                    -> ([BoolSMT], [BoolSMT], IdSMTs) 
+                    -> ([BoolSMT], [BoolSMT], IdSMTs)
                     -> ([BoolSMT], [BoolSMT], IdSMTs)
 partitionSSA (SSAAssign nID newE) (assigns, asserts, idSMTs) =
     (assign : assigns, asserts, Set.union idSMTs $ Set.insert idSMT  idSMTs')

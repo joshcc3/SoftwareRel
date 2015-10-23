@@ -1,7 +1,7 @@
-{-# LANGUAGE 
-  DeriveFunctor, 
-  DeriveFoldable, 
-  DeriveTraversable, 
+{-# LANGUAGE
+  DeriveFunctor,
+  DeriveFoldable,
+  DeriveTraversable,
   TemplateHaskell #-}
 
 module HSRTool.Parser.Types where
@@ -72,12 +72,12 @@ instance Bifoldable ProcedureDecl where
     bifoldMap f g b = fold (bimap f g b)
 
 instance Bifunctor ProcedureDecl where
-    bimap f g (PDecl a id fp pp sts e) 
-        = PDecl (g a) (f id) (map (bimap f g) fp) (map (bimap f g) pp) 
+    bimap f g (PDecl a id fp pp sts e)
+        = PDecl (g a) (f id) (map (bimap f g) fp) (map (bimap f g) pp)
            (map (bimap f g) sts) (fmap f e)
 
 instance Bitraversable ProcedureDecl where
-    bitraverse f g (PDecl a id fp pp sts e) 
+    bitraverse f g (PDecl a id fp pp sts e)
         = PDecl <$> (g a) <*> (f id) <*> (traverse (bitraverse f g) fp) <*> (traverse (bitraverse f g) pp) <*>
            (traverse (bitraverse f g) sts) <*> (traverse f e)
 
@@ -102,7 +102,7 @@ instance Bifunctor PrePost where
     bimap f g (PPEns a e) = PPEns (g a) (bimap id f e)
 
 instance Bitraversable PrePost where
-    bitraverse f g (PPReq a e) 
+    bitraverse f g (PPReq a e)
         = PPReq <$> g a <*> bitraverse pure f e
 
 
@@ -191,7 +191,7 @@ instance Bifoldable AssertStmt where
     bifoldMap f g = fold . bimap f g
 
 instance Bitraversable AssertStmt where
-    bitraverse f g (AssertStmt a e) 
+    bitraverse f g (AssertStmt a e)
         = AssertStmt <$> g a <*> traverse f e
 
 data AssumeStmt id a = AssumeStmt {
@@ -212,7 +212,7 @@ instance Bifoldable AssumeStmt where
     bifoldMap f g = fold . bimap f g
 
 instance Bitraversable AssumeStmt where
-    bitraverse f g (AssumeStmt a e) 
+    bitraverse f g (AssumeStmt a e)
         = AssumeStmt <$> g a <*> traverse f e
 
 data HavocStmt id a = HavocStmt {
@@ -232,7 +232,7 @@ instance Bifoldable HavocStmt where
     bifoldMap f g = fold . bimap f g
 
 instance Bitraversable HavocStmt where
-    bitraverse f g (HavocStmt a e) 
+    bitraverse f g (HavocStmt a e)
         = HavocStmt <$> g a <*> f e
 
 data IfStmt id a = IfStmt {
@@ -250,7 +250,7 @@ instance Bifoldable IfStmt where
     bifoldMap f g = fold . bimap f g
 
 instance Bitraversable IfStmt where
-    bitraverse f g (IfStmt a e t els) 
+    bitraverse f g (IfStmt a e t els)
         = IfStmt <$> g a <*> traverse f e <*> (traverse (bitraverse f g) t)
           <*> ((traverse.traverse) (bitraverse f g) els)
 

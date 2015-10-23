@@ -18,7 +18,6 @@ statementParser =
     SIfStmt () <$> try ifStmt <|>
     SBlockStmt () <$> blockStmt
 
--- varDecl :: ParsecT String u Identity (VarDecl String ASTInfo)
 varDecl = VarDecl () <$>
           (string intK *> many space *>
            ident

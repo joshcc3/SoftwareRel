@@ -17,11 +17,7 @@ import Data.Foldable (foldMap)
 type Assumption = NewExpr
 type Pred = Expr
 type M id id' = M.Map id id'
---data NewId = NewId {
---      _count :: Int,
---      _newVarId :: String
---} deriving (Eq, Ord, Show, Read)
-makeLenses ''NewId
+
 data St id id' = St {
       _m :: M id id',
       _ass :: Assumption Op NewId
@@ -35,7 +31,7 @@ runSSAGenerator :: Program String a -> IO (SSA Op NewId)
 runSSAGenerator (Program _ vD pD) = do
   o <- runStack initSt pDecls
   return (snd o)
-    where 
+    where
       initSt = St M.empty (NE (ELit 1))
       g x = do
         m %= initialize (_varId x)
@@ -48,7 +44,7 @@ type SSAEval id = StateT (St id NewId) (WriterT (SSA Op NewId) IO)
 genStat (PPReq _ e) = Left (SAssumeStmt () (AssumeStmt () e))
 genStat (PPEns _ e) = Right (SAssertStmt () (AssertStmt () e))
 transProg = pPDecls.traverse %~ g
-    where 
+    where
       g p = case partitionEithers (map genStat (_pPrepost p)) of
               (ls, rs) -> p & pStmts %~ (ls ++) . (++ rs)
 
