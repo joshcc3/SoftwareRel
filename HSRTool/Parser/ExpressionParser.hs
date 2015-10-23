@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase, FlexibleContexts, FlexibleInstances #-}
 
-module HSRTool.Parser.ExpressionParser(parseExpr, opInfo) where
+module HSRTool.Parser.ExpressionParser(parseExpr) where
 
 import Control.Applicative hiding (many, (<|>))
 import Text.Parsec

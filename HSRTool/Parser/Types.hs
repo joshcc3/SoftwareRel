@@ -17,6 +17,7 @@ type ASTInfo = ()
 data Op = Mul | Div | Add | Sub | Exp | Mod | LShift | RShift |
           BitXOr | BitAnd | BitOr | GrEq | Gr | Lt | LtEq | NEq |
           Eq | Not | BitNot | LAnd | LOr | LNot | SIfCond | SIfAlt
+
           deriving (Show, Eq, Read, Ord)
 
 data BinOp n = BinOp { _fst' :: n, _snd' :: n } deriving (Eq, Ord, Show, Read, Functor)
