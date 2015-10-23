@@ -9,19 +9,19 @@ import Text.Parsec
 import HSRTool.Parser.Types
 import Data.Functor.Identity
 
-statementParser = 
-    SVarDecl <$> try varDecl <|> 
-    SAssignStmt <$> try assignStmt <|> 
-    SAssertStmt <$> try assertStmt <|> 
-    SAssumeStmt <$> try assumeStmt <|> 
-    SHavocStmt <$> try havocStmt <|>
-    SIfStmt <$> try ifStmt <|> 
-    SBlockStmt <$> blockStmt
+statementParser =
+    SVarDecl () <$> try varDecl <|>
+    SAssignStmt () <$> try assignStmt <|>
+    SAssertStmt () <$> try assertStmt <|>
+    SAssumeStmt () <$> try assumeStmt <|>
+    SHavocStmt () <$> try havocStmt <|>
+    SIfStmt () <$> try ifStmt <|>
+    SBlockStmt () <$> blockStmt
 
-varDecl :: ParsecT String u Identity (VarDecl String)
-varDecl = VarDecl <$> 
-          (string intK *> many space *> 
-           ident 
+varDecl :: ParsecT String u Identity (VarDecl String ASTInfo)
+varDecl = VarDecl () <$>
+          (string intK *> many space *>
+           ident
            <* string semicolonT)
 
 assignStmt = do
@@ -33,7 +33,7 @@ assignStmt = do
   many space
   string semicolonT
   many space
-  return (AssignStmt i e)
+  return (AssignStmt () i e)
 assertStmt = do
   string assertK
   many space
@@ -41,7 +41,7 @@ assertStmt = do
   many space
   string semicolonT
   many space
-  return (AssertStmt e)
+  return (AssertStmt () e)
 assumeStmt = do
   string assumeK
   many space
@@ -49,7 +49,7 @@ assumeStmt = do
   many space
   string semicolonT
   many space
-  return (AssumeStmt e)
+  return (AssumeStmt () e)
 havocStmt = do
   string havocK
   many space
@@ -57,8 +57,8 @@ havocStmt = do
   many space
   string semicolonT
   many space
-  return (HavocStmt i)
---ifStmt :: Stream String Identity Char => Parsec String u String
+  return (HavocStmt () i)
+-- ifStmt :: Stream String Identity Char => Parsec String u String
 ifStmt = do
   string ifK
   many space
@@ -73,7 +73,7 @@ ifStmt = do
         many space
         return (Just b)
       ) <|> return Nothing
-  return (IfStmt e b b')
+  return (IfStmt () e b b')
 blockStmt = do
   string ocurlyT
   many space
@@ -81,4 +81,3 @@ blockStmt = do
   many space
   string ccurlyT
   return s
-
