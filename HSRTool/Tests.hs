@@ -1,7 +1,6 @@
 module HSRTool.Tests where
 
 import HSRTool.Parser.Parser
-import HSRTool.TypeChecker.TypeChecker
 
 divZeroP = "divzero.c"
 ifP = "if.c"
@@ -15,4 +14,4 @@ cPrefix = "tests/correct"
 (</>) a b = concat [a, "/", b]
 runTest p = readFile (cPrefix </> p) >>= return . check
 
-check s = parse s >>= return . typeCheck
+check s = parse s >>= return
