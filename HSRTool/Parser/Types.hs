@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor, TemplateHaskell #-}
 
 module HSRTool.Parser.Types where
 
@@ -10,58 +10,19 @@ import Data.Foldable
 import Data.Bifoldable
 import Data.Bitraversable
 import Data.Bifunctor
+import Control.Lens
 
-data Program id = Program {
-      pVarDecls :: [VarDecl id],
-      pPDecls :: [ProcedureDecl id]
-} deriving (Eq, Ord, Show, Read, Functor)
+type ASTInfo = ()
 
-data VarDecl id = VarDecl {
-      varId :: id
-} deriving (Eq, Ord, Show, Read, Functor)
+data Op = Mul | Div | Add | Sub | Exp | Mod | LShift | RShift |
+          BitXOr | BitAnd | BitOr | GrEq | Gr | Lt | LtEq | NEq |
+          Eq | Not | BitNot | LAnd | LOr | LNot | SIfCond | SIfAlt
+          deriving (Show, Eq, Read, Ord)
 
-data ProcedureDecl id = PDecl {
-      pId :: id,
-      pFParams :: [FormalParam id],
-      pPrepost :: [PrePost id],
-      pStmts :: [Stmt id],
-      pExpr :: Expr Op id
-} deriving (Eq, Ord, Show, Read, Functor)
-
-data FormalParam id = FParam { fID :: id }
-                      deriving (Eq, Ord, Show, Read, Functor)
-data PrePost id = PPReq (Expr Op id) | PPEns (Expr Op id)
-                  deriving (Eq, Ord, Show, Read, Functor)
-data Stmt id = SVarDecl (VarDecl id) |
-            SAssignStmt (AssignStmt id) |
-            SAssertStmt (AssertStmt id) |
-            SAssumeStmt (AssumeStmt id) |
-            SHavocStmt (HavocStmt id) |
-            SIfStmt (IfStmt id) |
-            SBlockStmt [Stmt id] deriving (Eq, Ord, Show, Read, Functor)
-
-data AssignStmt id = AssignStmt {
-      assgnID :: id,
-      assgnExpr :: (Expr Op id)
-} deriving (Eq, Ord, Show, Read, Functor)
-
-data AssertStmt id = AssertStmt {
-      assrtExpr :: (Expr Op id)
-} deriving (Eq, Ord, Show, Read, Functor)
-
-data AssumeStmt id = AssumeStmt {
-      assmeExpr :: (Expr Op id)
-} deriving (Eq, Ord, Show, Read, Functor)
-
-data HavocStmt id = HavocStmt {
-      hID :: id
-} deriving (Eq, Ord, Show, Read, Functor)
-
-data IfStmt id = IfStmt {
-      ifExpr :: Expr Op id,
-      ifThenB :: [Stmt id],
-      ifElseB :: Maybe [Stmt id]
-} deriving (Eq, Ord, Show, Read, Functor)
+data BinOp n = BinOp { _fst' :: n, _snd' :: n } deriving (Eq, Ord, Show, Read, Functor)
+makeLenses ''BinOp
+data UnOp n = UnOp { _only :: n } deriving (Eq, Ord, Show, Read, Functor)
+makeLenses ''UnOp
 
 data Expr op id = EShortIf (Expr op id) (Expr op id) (Expr op id) |
                   EBinOp op (BinOp (Expr op id)) |
@@ -70,6 +31,79 @@ data Expr op id = EShortIf (Expr op id) (Expr op id) (Expr op id) |
                   EID id |
                   EResult |
                   EOld id deriving (Eq, Ord, Show, Read, Functor)
+makePrisms ''Expr
+
+data Program id a = Program {
+      _pInfo :: a,
+      _pVarDecls :: [VarDecl id a],
+      _pPDecls :: [ProcedureDecl id a]
+} deriving (Eq, Ord, Show, Read, Functor)
+
+data VarDecl id a = VarDecl {
+      _vInfo :: a,
+      _varId :: id
+} deriving (Eq, Ord, Show, Read, Functor)
+
+data ProcedureDecl id a = PDecl {
+      _pdeclInfo :: a,
+      _pId :: id,
+      _pFParams :: [FormalParam id a],
+      _pPrepost :: [PrePost id a],
+      _pStmts :: [Stmt id a],
+      _pExpr :: Expr Op id
+} deriving (Eq, Ord, Show, Read, Functor)
+
+data FormalParam id a = FParam { _fpInfo :: a, _fID :: id }
+                      deriving (Eq, Ord, Show, Read, Functor)
+data PrePost id a = PPReq a (Expr Op id) | PPEns a (Expr Op id)
+                  deriving (Eq, Ord, Show, Read, Functor)
+data Stmt id a = SVarDecl a (VarDecl id a) |
+            SAssignStmt a (AssignStmt id a) |
+            SAssertStmt a (AssertStmt id a) |
+            SAssumeStmt a (AssumeStmt id a) |
+            SHavocStmt a (HavocStmt id a) |
+            SIfStmt a (IfStmt id a) |
+            SBlockStmt a [Stmt id a]
+            deriving (Eq, Ord, Show, Read, Functor)
+
+data AssignStmt id a = AssignStmt {
+      _assInfo :: a,
+      _assgnID :: id,
+      _assgnExpr :: (Expr Op id)
+} deriving (Eq, Ord, Show, Read, Functor)
+
+data AssertStmt id a = AssertStmt {
+      _assStmtInfo :: a,
+      _assrtExpr :: (Expr Op id)
+} deriving (Eq, Ord, Show, Read, Functor)
+
+data AssumeStmt id a = AssumeStmt {
+      _assmeInfo :: a,
+      _assmeExpr :: (Expr Op id)
+} deriving (Eq, Ord, Show, Read, Functor)
+
+data HavocStmt id a = HavocStmt {
+      _havocInfo :: a,
+      _hID :: id
+} deriving (Eq, Ord, Show, Read, Functor)
+
+data IfStmt id a = IfStmt {
+      _ifInfo :: a,
+      _ifExpr :: Expr Op id,
+      _ifThenB :: [Stmt id a],
+      _ifElseB :: Maybe [Stmt id a]
+} deriving (Eq, Ord, Show, Read, Functor)
+makePrisms ''PrePost
+makePrisms ''Stmt
+makeLenses ''FormalParam
+makeLenses ''ProcedureDecl
+makeLenses ''AssignStmt
+makeLenses ''AssumeStmt
+makeLenses ''AssertStmt
+makeLenses ''HavocStmt
+makeLenses ''IfStmt
+makeLenses ''VarDecl
+makeLenses ''Program
 
 instance Foldable (Expr op) where
     foldMap = bifoldMap (const mempty)
@@ -115,11 +149,9 @@ instance Monad (Expr op) where
    EResult >>= _ = EResult
    EOld id >>= f = f id
 
-data BinOp n = BinOp { fst' :: n, snd' :: n } deriving (Eq, Ord, Show, Read, Functor)
-
 instance Monad BinOp where
   return x = BinOp x x
-  BinOp x x' >>= f = BinOp (fst' (f x)) (snd' (f x'))
+  BinOp x x' >>= f = BinOp (_fst' (f x)) (_snd' (f x'))
 
 instance Foldable BinOp where
   foldMap f (BinOp n n') = f n <> f n'
@@ -130,8 +162,6 @@ instance Traversable BinOp where
 instance Applicative BinOp where
   pure = return
   (<*>) = ap
-
-data UnOp n = UnOp n deriving (Eq, Ord, Show, Read, Functor)
 
 instance Foldable UnOp where
   foldMap f (UnOp n) = f n
@@ -148,8 +178,3 @@ data OpInfo = OpInfo {
       symbol :: String,
       opType :: Either () ()
 } deriving (Eq, Ord, Show, Read)
-
-data Op = Mul | Div | Add | Sub | Exp | Mod | LShift | RShift |
-          BitXOr | BitAnd | BitOr | GrEq | Gr | Lt | LtEq | NEq |
-          Eq | Not | BitNot | LAnd | LOr | LNot | SIfCond | SIfAlt
-          deriving (Show, Eq, Read, Ord)
