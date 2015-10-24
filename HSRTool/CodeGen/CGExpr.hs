@@ -28,18 +28,20 @@ data St id id' = St {
 }
 makeLenses ''St
 
+runStack :: b -> StateT b (WriterT w m) a -> m ((a, b), w)
+runStack s = runWriterT . flip runStateT s
 
-runSSAEvalStack s m = runStateT m s & _1 %~ runWriterT 
-
-
-
---runSSAGen :: Program String () -> [SSA Op NewId]
-runSSAGen (Program _ vD pD) = undefined -- runSSAEvalStack initSt undefined -- m
+runSSAGenerator :: Program String a -> IO (SSA Op NewId)
+runSSAGenerator (Program _ vD pD) = do
+  o <- runStack initSt pDecls
+  return (snd o)
     where 
       initSt = St M.empty (NE (ELit 1))
-      m = do
-        mapM_ ((m %=) . initialize . _varId) vD
-        undefined -- mapM_ (flip toSSA (ELit 1)) $ pD >>= _pStmts
+      g x = do
+        m %= initialize (_varId x)
+      pDecls = do
+        mapM_ g vD
+        mapM_ (flip toSSA (ELit 1)) $ pD >>= _pStmts
 
 type SSAEval id = StateT (St id NewId) (WriterT (SSA Op NewId) IO)
 

@@ -1,6 +1,10 @@
 module HSRTool.Tests where
 
 import HSRTool.Parser.Parser
+import HSRTool.Parser.Types
+import Control.Monad.Error
+import HSRTool.CodeGen.CGExpr
+import HSRTool.CodeGen.Types
 
 divZeroP = "divzero.c"
 ifP = "if.c"
@@ -12,6 +16,11 @@ simplesubP = "simplesub.c"
 
 cPrefix = "tests/correct"
 (</>) a b = concat [a, "/", b]
-runTest p = readFile (cPrefix </> p) >>= return . check
+runParserTest p = readFile (cPrefix </> p) >>= return . parse
 
-check s = parse s >>= return
+type Env = Either String (SSAEval String ())
+
+runSSAGenTest :: String -> IO (SSA Op NewId)
+runSSAGenTest p = do
+    res <- runParserTest p
+    either (\_ -> return []) runSSAGenerator res
