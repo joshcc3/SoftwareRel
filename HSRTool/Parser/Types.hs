@@ -150,6 +150,11 @@ instance Monad (Expr op) where
    EResult >>= _ = EResult
    EOld id >>= f = f id
 
+instance Applicative (Expr op) where
+    pure = return
+    (<*>) = ap
+
+
 instance Monad BinOp where
   return x = BinOp x x
   BinOp x x' >>= f = BinOp (_fst' (f x)) (_snd' (f x'))
@@ -163,6 +168,10 @@ instance Traversable BinOp where
 instance Applicative BinOp where
   pure = return
   (<*>) = ap
+
+instance Applicative UnOp where
+    pure = return
+    (<*>) = ap
 
 instance Foldable UnOp where
   foldMap f (UnOp n) = f n

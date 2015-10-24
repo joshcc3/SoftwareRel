@@ -2,6 +2,7 @@
 
 module HSRTool.CodeGen.CGExpr where
 
+import Data.Either (partitionEithers)
 import Data.Maybe
 import Data.Monoid
 import Control.Applicative
@@ -16,21 +17,40 @@ import Data.Foldable (foldMap)
 type Assumption = NewExpr
 type Pred = Expr
 type M id id' = M.Map id id'
+data NewId = NewId {
+      _count :: Int,
+      _newVarId :: String
+} deriving (Eq, Ord, Show, Read)
+makeLenses ''NewId
 data St id id' = St {
       _m :: M id id',
-      _ass :: Assumption Op id
+      _ass :: Assumption Op NewId
 }
 makeLenses ''St
 
-data NewId = NewId {
-      _count :: Int,
-      _varId :: String
-} deriving (Eq, Ord, Show, Read)
-makeLenses ''NewId
+
+runSSAEvalStack s m = runStateT m s & _1 %~ runWriterT 
+
+
+
+--runSSAGen :: Program String () -> [SSA Op NewId]
+runSSAGen (Program _ vD pD) = undefined -- runSSAEvalStack initSt undefined -- m
+    where 
+      initSt = St M.empty (NE (ELit 1))
+      m = do
+        mapM_ ((m %=) . initialize . _varId) vD
+        undefined -- mapM_ (flip toSSA (ELit 1)) $ pD >>= _pStmts
 
 type SSAEval id = StateT (St id NewId) (WriterT (SSA Op NewId) IO)
 
-toSSA :: Stmt String a -> Pred Op String -> SSAEval String ()
+genStat (PPReq _ e) = Left (SAssumeStmt () (AssumeStmt () e))
+genStat (PPEns _ e) = Right (SAssertStmt () (AssertStmt () e))
+transProg = pPDecls.traverse %~ g
+    where 
+      g p = case partitionEithers (map genStat (_pPrepost p)) of
+              (ls, rs) -> p & pStmts %~ (ls ++) . (++ rs)
+
+toSSA :: Stmt String a -> Pred Op NewId -> SSAEval String ()
 toSSA (SVarDecl _ (VarDecl _ id)) _ = do
   m %= initialize id
 toSSA (SAssignStmt _ (AssignStmt _ v e)) p = do
@@ -45,20 +65,20 @@ toSSA (SAssertStmt _ (AssertStmt _ e)) p = do
   tell [SSAAssert ((NEBinOp LAnd (NE p) assmpts) :=> NE (apply e mp))]
 toSSA (SBlockStmt _ l) p = mapM_ (flip toSSA p) l
 toSSA (SIfStmt _ (IfStmt _ e tn (Just el))) p = do
-  st <- get
-  let mp = _m st
+  st      <- get
+  let mp  = _m st
       newPred = apply e mp
   mapM_ (flip toSSA (EBinOp LAnd (BinOp p newPred))) tn
-  st' <- get
-  let m' = undefined -- _m st'
+  st'     <- get
+  let m'  = _m st'
   m .= mp
   mapM_ (flip toSSA (EBinOp LAnd  (BinOp p (EUnOp LNot (UnOp newPred))))) el
-  st'' <- get
+  st''    <- get
   let g v = do
         newId <- fresh v
         m.ix v .= newId
-        tell [SSAAssign newId (NE $ EShortIf newPred (lkup m' v) (lkup m'' v))]
-      m'' = undefined
+        tell [SSAAssign newId (NE $ EShortIf newPred (EID $ (lkup m' v)) (EID $ lkup m'' v))]
+      m'' = _m st''
   mapM_ g (S.elems (S.union (foldMap modset tn) (foldMap modset el)))
 toSSA (SIfStmt _ (IfStmt _ e tn Nothing)) p = do
   st <- get
@@ -70,8 +90,8 @@ toSSA (SIfStmt _ (IfStmt _ e tn Nothing)) p = do
       g v = do
         newId <- fresh v
         m.ix v .= newId
-        tell [SSAAssign newId (NE $ lkup m' v)]
-      m' = undefined -- _m st'
+        tell [SSAAssign newId (NE . EID $ lkup m' v)]
+      m' = _m st'
   mapM_ g (S.elems (foldMap modset tn))
 toSSA (SHavocStmt _ (HavocStmt _ v)) _ = do
   newId <- fresh v
