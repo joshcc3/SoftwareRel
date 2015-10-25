@@ -14,7 +14,7 @@ import Control.Lens
 
 type ASTInfo = ()
 
-data Op = Mul | Div | Add | Sub | Exp | Mod | LShift | RShift |
+data Op = Mul | Div | Add | Sub | Mod | LShift | RShift |
           BitXOr | BitAnd | BitOr | GrEq | Gr | Lt | LtEq | NEq |
           Eq | Not | BitNot | LAnd | LOr | LNot | SIfCond | SIfAlt
 

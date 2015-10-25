@@ -5,6 +5,8 @@ import HSRTool.Parser.Types
 import Control.Monad.Error
 import HSRTool.CodeGen.CGExpr
 import HSRTool.CodeGen.Types
+import HSRTool.CodeGen.SMTForm
+import Control.Applicative
 
 divZeroP = "divzero.c"
 ifP = "if.c"
@@ -24,3 +26,7 @@ runSSAGenTest :: String -> IO (SSA Op NewId)
 runSSAGenTest p = do
     res <- runParserTest p
     either (\_ -> return []) runSSAGenerator res
+
+runSMTGenTest :: String -> IO ([String])
+runSMTGenTest p =
+    fromSSA <$> runSSAGenTest p
