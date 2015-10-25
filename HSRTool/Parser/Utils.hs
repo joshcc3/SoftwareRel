@@ -2,14 +2,14 @@
 
 module HSRTool.Parser.Utils where
 
-import Control.Monad
+import Control.Monad.Trans
 import Data.List (nub)
 import Data.Functor.Identity
 import Control.Applicative hiding (many, (<|>))
 import Text.Parsec
 --import Directory.WalkDir
 
-rp :: Stream s Identity c => Parsec s () a -> s -> Either ParseError a
+-- rp :: Stream s Identity c => Parsec s () a -> s -> Either ParseError a
 rp p s = parse p "" s
 
 intK :: String
@@ -72,7 +72,7 @@ nos = all digits
 digits x = x >= '0' && x <= '9'
 
 parseSeq [] = return []
-parseSeq (x:xs) = ((:) <$> try x <*> parseSeq xs) <|> anyChar *> parseSeq (x:xs)  
+parseSeq (x:xs) = ((:) <$> try x <*> parseSeq xs) <|> anyChar *> parseSeq (x:xs)
 
 oneOfParsers l = foldl1 (<|>) l
 
@@ -82,7 +82,7 @@ manyTill' x y = (try y *> pure []) <|> ((:) <$> x <*> manyTill' x y)
 
 ident :: Stream String Identity Char => Parsec String u String
 ident = (:) <$> chs <*> many (chs <|> digit)
-    where 
+    where
       chs = lower <|> upper <|> char '_'
 
 bar x = try ((:) <$> (x <* many space) <*> (try (string commaT *> many space *> bar x) <|> ([] <$ many space)))
