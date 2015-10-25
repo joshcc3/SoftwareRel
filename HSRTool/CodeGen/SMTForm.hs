@@ -20,6 +20,14 @@ applyFuncSmt :: String -> String -> String
 applyFuncSmt funcSmt smt =
     "(" ++ funcSmt ++ " " ++ smt ++ ")"
 
+apply2FuncSmt :: String -> String -> String -> String
+apply2FuncSmt funcSmt lSmt rSmt =
+    "(" ++ funcSmt ++ " " ++ lSmt ++ " " ++ rSmt ++ ")"
+
+apply3FuncSmt :: String -> String -> String -> String -> String
+apply3FuncSmt funcSmt lSmt mSmt rSmt =
+    "(" ++ funcSmt ++ " " ++ lSmt ++ " " ++ mSmt ++ " " ++ rSmt ++ ")"
+
 fromBvToBoolSmt :: BvSMT -> BoolSMT
 fromBvToBoolSmt =
     applyFuncSmt "tobool"
@@ -77,37 +85,69 @@ fromNewExpr (lNewE :=> rNewE) =
     where
         (lBvSmt, lIdSMTs) = fromNewExpr lNewE
         (rBvSmt, rIdSMTs) = fromNewExpr rNewE
-        (lBoolSmt, rBoolSmt) = fmap fromBvToBoolSmt (lBvSmt, rBvSmt)
-        bvSmt = fromBoolToBvSmt $ "(=> " ++ lBoolSmt ++ " " ++ rBoolSmt ++ ")"
+        bvSmt = fromBoolBinOp "=>" lBvSmt rBvSmt
 
 fromExpr :: Expr Op NewId -> (BvSMT, [IdSMT])
-fromExpr expr = ("ahah", [])
+--fromExpr (EShortIf condE thenE elseE) =
+fromExpr (EBinOp SIfCond (BinOp condE (EBinOp SIfAlt (BinOp thenE elseE)))) =
+    (result, concat idSMTsList)
+    where
+        ([condSmt, thenSmt, elseSmt], idSMTsList)
+            = unzip $ map fromExpr [condE, thenE, elseE]
+        result = apply3FuncSmt "ite" (fromBvToBoolSmt condSmt) thenSmt elseSmt
+fromExpr (EUnOp op (UnOp expr)) =
+    (fromUnOp op bvSmt, idSMTs)
+    where
+        (bvSmt, idSMTs) = fromExpr expr
+fromExpr (EBinOp op (BinOp lExpr rExpr)) =
+    (fromBinOp op lBvSmt rBvSmt, lIdSMTs ++ rIdSMTs)
+    where
+        (lBvSmt, lIdSMTs) = fromExpr lExpr
+        (rBvSmt, rIdSMTs) = fromExpr rExpr
+fromExpr (ELit n) =
+    ("(_ bv" ++ show n ++ " 32)", [])
+fromExpr (EID id) =
+    (idSMT, [idSMT])
+    where
+        idSMT = newIdToIdSMT id
+--fromExpr EResult | TODO
+--fromExpr EOld
 
 fromBinOp :: Op -> BvSMT -> BvSMT -> BvSMT
-fromBinOp Mul = fromNormalBinOp "bvmul"
---fromBinOp Div lExpr rExpr = "bvsdiv"
---fromBinOp Add lExpr rExpr = "bvadd"
---fromBinOp Sub lExpr rExpr = "bvsub"
---fromBinOp Mod lExpr rExpr = "bvsmod"
---fromBinOp LShift lExpr rExpr = "bvshl"
---fromBinOp RShift lExpr rExpr = "bvashr"
---fromBinOp BitXOr lExpr rExpr = "bvxor"
---fromBinOp BitAnd lExpr rExpr = "bvand"
---fromBinOp BitOr lExpr rExpr = "bvor"
---fromBinOp GrEq lExpr rExpr = "bvsge"
---fromBinOp Gr lExpr rExpr = "bvsgt"
---fromBinOp Lt lExpr rExpr = "bvslt"
---fromBinOp LtEq lExpr rExpr = "bvsle"
-fromBinOp NEq = (((.) . (.)) (applyFuncSmt "not") (fromNormalBinOp "="))
-fromBinOp Eq = fromNormalBinOp "="
---fromBinOp Not = "bvneg"
---fromBinOp BitNot lExpr rExpr = "bvnot"
---fromBinOp LAnd lExpr rExpr = ""
---fromBinOp LOr lExpr rExpr = ""
---fromBinOp LNot lExpr rExpr = ""
---fromBinOp SIfCond lExpr rExpr = ""
---fromBinOp SIfAlt lExpr rExpr = ""
+fromBinOp Mul = apply2FuncSmt "bvmul"
+fromBinOp Div = apply2FuncSmt "bvsdiv"
+fromBinOp Add = apply2FuncSmt "bvadd"
+fromBinOp Sub = apply2FuncSmt "bvsub"
+fromBinOp Mod = apply2FuncSmt "bvsmod"
+fromBinOp LShift = apply2FuncSmt "bvshl"
+fromBinOp RShift = apply2FuncSmt "bvashr"
+fromBinOp BitXOr = apply2FuncSmt "bvxor"
+fromBinOp BitAnd = apply2FuncSmt "bvand"
+fromBinOp BitOr = apply2FuncSmt "bvor"
+fromBinOp GrEq = pipeBoolInBvSmt fromBoolToBvSmt $ apply2FuncSmt "bvsge"
+fromBinOp Gr = pipeBoolInBvSmt fromBoolToBvSmt $ apply2FuncSmt "bvsgt"
+fromBinOp Lt = pipeBoolInBvSmt fromBoolToBvSmt $ apply2FuncSmt "bvslt"
+fromBinOp LtEq = pipeBoolInBvSmt fromBoolToBvSmt $ apply2FuncSmt "bvsle"
+fromBinOp NEq =
+    pipeBoolInBvSmt (fromBoolToBvSmt . applyFuncSmt "not") (apply2FuncSmt "=")
+fromBinOp Eq = pipeBoolInBvSmt fromBoolToBvSmt $ apply2FuncSmt "="
+fromBinOp LAnd = fromBoolBinOp "and"
+fromBinOp LOr = fromBoolBinOp "or"
 
-fromNormalBinOp :: String -> BvSMT -> BvSMT -> BvSMT
-fromNormalBinOp funcSmt lBvSmt rBvSmt =
-    "(" ++ funcSmt ++ " " ++ lBvSmt ++ " " ++ rBvSmt ++ ")"
+pipeBoolInBvSmt :: (BoolSMT -> BvSMT) -> (BvSMT -> BvSMT -> BoolSMT)
+                    -> (BvSMT -> BvSMT -> BvSMT)
+pipeBoolInBvSmt = (.) . (.)
+
+fromUnOp :: Op -> BvSMT -> BvSMT
+fromUnOp LNot =  fromBoolToBvSmt . applyFuncSmt "not" . fromBvToBoolSmt
+fromUnOp BitNot = applyFuncSmt "bvnot"
+-- fromBinOp Not = TODO
+--fromBinOp SIfCond = apply2FuncSmt ""
+--fromBinOp SIfAlt = apply2FuncSmt ""
+
+fromBoolBinOp :: String -> BvSMT -> BvSMT -> BvSMT
+fromBoolBinOp funcSmt lBvSmt rBvSmt =
+    fromBoolToBvSmt boolSmt
+    where
+        (lBoolSmt, rBoolSmt) = fmap fromBvToBoolSmt (lBvSmt, rBvSmt)
+        boolSmt = apply2FuncSmt funcSmt lBoolSmt rBoolSmt
