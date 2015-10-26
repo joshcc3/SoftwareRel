@@ -124,7 +124,21 @@ modset (SIfStmt _ (IfStmt _ b th Nothing)) = foldMap modset th
 modset (SIfStmt _ (IfStmt _ b th (Just el))) = foldMap modset th `S.union` foldMap modset el
 modset (SBlockStmt _ stmts) = foldMap modset stmts
 initialize id m = M.insert id (NewId 0 id) m
-
+{-
 
 -- loeb :: Functor f => f (f a -> b) -> f b
 -- loeb f = fmap ($loeb f) f
+enter a new scope:
+
+
+
+int x1;
+x1 = 1;
+{
+x1 = 3;
+int x2;
+x2 = 10;
+}
+assert x1 == 3;
+  
+-}

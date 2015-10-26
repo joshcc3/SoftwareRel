@@ -114,7 +114,7 @@ data Stmt id a = SVarDecl { _svdInfo :: a, _svdVDecl :: (VarDecl id a) } |
             SIfStmt { _sifInfo :: a, _sifIfStmt :: (IfStmt id a) } |
             SBlockStmt { _sIBInfo :: a, _sbBlockStmt :: [Stmt id a] }
             deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
-{-
+
 instance Comonad (Stmt id) where
     extract (SVarDecl a _) = a
     extract (SAssignStmt a _) = a
@@ -124,14 +124,16 @@ instance Comonad (Stmt id) where
     extract (SIfStmt a _) = a
     extract (SBlockStmt a _) = a
 
-    duplicate s@(SVarDecl _ v) = SVarDecl s (duplicate v)
-    duplicate s@(SAssignStmt a v) = SAssignStmt s (duplicate v)
-    duplicate s@(SAssertStmt a v) = SAssertStmt s (duplicate v)
-    duplicate s@(SAssumeStmt a v) = SAssumeStmt s (duplicate v)
-    duplicate s@(SHavocStmt a v) = SHavocStmt s (duplicate v)
-    duplicate s@(SIfStmt a v) = SIfStmt s (duplicate v)
-    duplicate s@(SBlockStmt a v) = SBlockStmt s (map duplicate v)
--}
+    duplicate s@(SVarDecl _ (VarDecl _ id)) = SVarDecl s (VarDecl s id)
+    duplicate s@(SAssignStmt _ (AssignStmt _ e v)) = SAssignStmt s (AssignStmt s e v)
+    duplicate s@(SAssertStmt _ (AssertStmt _ v)) = SAssertStmt s (AssertStmt s v)
+    duplicate s@(SAssumeStmt _ (AssumeStmt _ v)) = SAssumeStmt s (AssumeStmt s v)
+    duplicate s@(SHavocStmt _ (HavocStmt _ v)) = SHavocStmt s (HavocStmt s v)
+    duplicate s@(SIfStmt _ ifS@(IfStmt _ e st els))
+        = SIfStmt s (IfStmt s e (map duplicate st) ((fmap.map) duplicate els))
+    duplicate s@(SBlockStmt _ v) 
+        = SBlockStmt s (map duplicate v)
+
 
 instance Bifunctor Stmt where
     bimap f g (SVarDecl a d) = SVarDecl (g a) (bimap f g d)
