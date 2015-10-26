@@ -89,7 +89,7 @@ parseExpr = tokeniseExpr >>= toRPN >>= fmap (head . fst) . go []
                              (opType $ opInfo op)
       go (e2:e1:es) (OutOp op:r)
           = either
-            (\_ -> go (EBinOp op (BinOp e1 e2):es) r)
+            (\_ -> go (EBinOp op (Pair e1 e2):es) r)
             (\_ -> go (EUnOp op (UnOp e2):e1:es) r)
             (opType $ opInfo op)
 

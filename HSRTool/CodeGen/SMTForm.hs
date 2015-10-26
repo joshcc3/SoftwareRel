@@ -119,7 +119,7 @@ fromNewExpr (lNewE :=> rNewE) =
 
 fromExpr :: ExprSSA -> (BvSMT, IdSMTs)
 --fromExpr (EShortIf condE thenE elseE) =
-fromExpr (EBinOp SIfCond (BinOp condE (EBinOp SIfAlt (BinOp thenE elseE)))) =
+fromExpr (EBinOp SIfCond (Pair condE (EBinOp SIfAlt (Pair thenE elseE)))) =
     (result, Set.unions idSMTsList)
     where
         ([condSmt, thenSmt, elseSmt], idSMTsList)
@@ -129,7 +129,7 @@ fromExpr (EUnOp op (UnOp expr)) =
     (fromUnOp op bvSmt, idSMTs)
     where
         (bvSmt, idSMTs) = fromExpr expr
-fromExpr (EBinOp op (BinOp lExpr rExpr)) =
+fromExpr (EBinOp op (Pair lExpr rExpr)) =
     (fromBinOp op lBvSmt rBvSmt, Set.union lIdSMTs rIdSMTs)
     where
         (lBvSmt, lIdSMTs) = fromExpr lExpr

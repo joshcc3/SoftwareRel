@@ -10,13 +10,14 @@ import HSRTool.Parser.Types
 import Data.Functor.Identity
 
 statementParser =
-    SVarDecl () <$> try varDecl <|>
-    SAssignStmt () <$> try assignStmt <|>
-    SAssertStmt () <$> try assertStmt <|>
-    SAssumeStmt () <$> try assumeStmt <|>
-    SHavocStmt () <$> try havocStmt <|>
-    SIfStmt () <$> try ifStmt <|>
-    SBlockStmt () <$> blockStmt
+    SVarDecl <$> try varDecl <|>
+    SAssignStmt <$> try assignStmt <|>
+    SAssertStmt <$> try assertStmt <|>
+    SAssumeStmt <$> try assumeStmt <|>
+    SHavocStmt <$> try havocStmt <|>
+    SIfStmt <$> try ifStmt <|>
+    SBlockStmt (Either' (Left ()), Either' (Right ())) <$> blockStmt
+-- varDecl :: ParsecT String u Identity (VarDecl String ASTInfo)
 
 varDecl = VarDecl () <$>
           (string intK *> many space *>
