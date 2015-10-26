@@ -52,6 +52,7 @@ transProg = pPDecls.traverse %~ g
       g p = case partitionEithers (map genStat (_pPrepost p)) of
               (ls, rs) -> p & pStmts %~ (ls ++) . (++ rs)
 
+
 toSSA :: Stmt String a -> Pred Op NewId -> SSAEval String ()
 toSSA (SVarDecl _ (VarDecl _ id)) _ = do
   m %= initialize id
