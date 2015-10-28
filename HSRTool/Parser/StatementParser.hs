@@ -16,8 +16,7 @@ statementParser =
     SAssumeStmt <$> try assumeStmt <|>
     SHavocStmt <$> try havocStmt <|>
     SIfStmt <$> try ifStmt <|>
-    SBlockStmt () <$> blockStmt
-
+    SBlockStmt (Either' (Left ()), Either' (Right ())) <$> blockStmt
 -- varDecl :: ParsecT String u Identity (VarDecl String ASTInfo)
 varDecl = VarDecl () <$>
           (string intK *> many space *>

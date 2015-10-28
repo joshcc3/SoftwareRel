@@ -158,9 +158,8 @@ data Stmt id a = SVarDecl { _svdVDecl :: (VarDecl id a) } |
             SAssumeStmt { _sassumeStmt :: (AssumeStmt id a) } |
             SHavocStmt { _shHavocStmt :: (HavocStmt id a) } |
             SIfStmt { _sifIfStmt :: (IfStmt id a) } |
-            SBlockStmt { _sbInfo :: a, _sbBlockStmt :: [Stmt id a] } |
-            SBlockStmt' { _sbAInfo :: (Either' a, Either' a),
-                          _sbBlockStmt' :: [Stmt id a] } |
+            SBlockStmt { _sbAInfo :: (Either' a, Either' a),
+                       _sbBlockStmt :: [Stmt id a] } |
             SIfStmt' { _sifIfStmt' :: IfStmt' id a }
             deriving (Eq, Ord, Show, Read, Functor)
 
@@ -177,9 +176,8 @@ instance Bifunctor Stmt where
     bimap f g (SAssumeStmt s) = SAssumeStmt (bimap f g s)
     bimap f g (SHavocStmt h) = SHavocStmt  (bimap f g h)
     bimap f g (SIfStmt i) = SIfStmt  (bimap f g i)
-    bimap f g (SBlockStmt a s) = SBlockStmt (g a) (map (bimap f g) s)
-    bimap f g (SBlockStmt' (l, r) s) 
-        = SBlockStmt' (fmap g l, fmap g r) (map (bimap f g) s)
+    bimap f g (SBlockStmt (l, r) s) 
+        = SBlockStmt (fmap g l, fmap g r) (map (bimap f g) s)
 
 instance Bifoldable Stmt where
     bifoldMap f g = fold . bimap f g
@@ -191,14 +189,13 @@ instance Bitraversable Stmt where
     bitraverse f g (SAssumeStmt s) = SAssumeStmt <$> (bitraverse f g s)
     bitraverse f g (SHavocStmt h) = SHavocStmt <$> (bitraverse f g h)
     bitraverse f g (SIfStmt i) = SIfStmt <$> (bitraverse f g i)
-    bitraverse f g (SBlockStmt a s) = SBlockStmt <$> (g a) <*> (traverse (bitraverse f g) s)
-    bitraverse f g (SBlockStmt' (l, r) s) 
+    bitraverse f g (SBlockStmt (l, r) s) 
         = h <$> 
           traverse g l
           <*> traverse (bitraverse f g) s
           <*> traverse g r
               where 
-                h x y z = SBlockStmt' (x, z) y
+                h x y z = SBlockStmt (x, z) y
 data AssignStmt id a = AssignStmt {
       _assInfo :: a,
       _assgnID :: id,
@@ -429,8 +426,7 @@ instance Comonad (Stmt id) where
     extract (SAssumeStmt a) = _assmeInfo a
     extract (SHavocStmt h) = _havocInfo h
     extract (SIfStmt i) = _ifInfo i
-    extract (SBlockStmt a _) = a
-    extract (SBlockStmt' e _) = either' id id . fst $ e
+    extract (SBlockStmt e _) = either' id id . fst $ e
     extract (SIfStmt' i) = _ifEntryInfo i
 
     duplicate s@(SVarDecl (VarDecl _ id)) = SVarDecl (VarDecl s id)
@@ -440,10 +436,8 @@ instance Comonad (Stmt id) where
     duplicate s@(SHavocStmt (HavocStmt _ v)) = SHavocStmt (HavocStmt s v)
     duplicate s@(SIfStmt ifS@(IfStmt _ e st els ))
         = SIfStmt (IfStmt s e (map duplicate st) ((fmap.map) duplicate els))
-    duplicate s@(SBlockStmt _ v) 
-        = SBlockStmt s (map duplicate v)
-    duplicate s@(SBlockStmt' (l, r) st) 
-        = SBlockStmt' a' (fmap duplicate st)
+    duplicate s@(SBlockStmt (l, r) st) 
+        = SBlockStmt a' (fmap duplicate st)
           where 
             a' = (s <$ l, s' <$ r)
             s' = s & sbAInfo %~ swap

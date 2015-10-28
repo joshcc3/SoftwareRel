@@ -1,12 +1,14 @@
-module HSRTool.Tests where
+module HSRTool.Test.Utils where
 
+import qualified Data.Map as M
+import Control.Monad.State
 import HSRTool.Parser.Parser
 import HSRTool.Parser.Types
-import Control.Monad.Error
 import HSRTool.CodeGen.CGExpr
 import HSRTool.CodeGen.Types
 import HSRTool.CodeGen.SMTForm
 import Control.Applicative
+import HSRTool.Utils
 
 divZeroP = "divzero.c"
 ifP = "if.c"
@@ -16,9 +18,10 @@ simpleeqP = "simpleeq.c"
 simplelorP = "simplelor.c"
 simplesubP = "simplesub.c"
 
-cPrefix = "tests/correct"
+correctPrefix = "tests/correct"
 (</>) a b = concat [a, "/", b]
-runParserTest p = readFile (cPrefix </> p) >>= return . parse
+runParserTest p = readFile p >>= return . parse
+
 
 type Env = Either String (SSAEval String ())
 
