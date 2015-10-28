@@ -3,6 +3,7 @@
 module HSRTool.CodeGen.SMTForm where
 
 import Data.List (nub)
+import qualified Data.Set as Set
 
 import HSRTool.Parser.Types
 
@@ -13,6 +14,8 @@ type IdSMT = String
 type BvSMT = String
 type BoolSMT = String
 
+type IdSMTs = Set.Set IdSMT
+
 newIdToIdSMT :: NewId -> IdSMT
 newIdToIdSMT nID = _newVarId nID ++ "_" ++ show (_count nID)
 
@@ -21,12 +24,14 @@ applyFuncSmt funcSmt smt =
     "(" ++ funcSmt ++ " " ++ smt ++ ")"
 
 apply2FuncSmt :: String -> String -> String -> String
-apply2FuncSmt funcSmt lSmt rSmt =
-    "(" ++ funcSmt ++ " " ++ lSmt ++ " " ++ rSmt ++ ")"
+apply2FuncSmt funcSmt leftSmt rightSmt =
+    "(" ++ funcSmt ++ " " ++ leftSmt ++ " " ++ rightSmt ++ ")"
 
-apply3FuncSmt :: String -> String -> String -> String -> String
-apply3FuncSmt funcSmt lSmt mSmt rSmt =
-    "(" ++ funcSmt ++ " " ++ lSmt ++ " " ++ mSmt ++ " " ++ rSmt ++ ")"
+applyIfThenElse :: String -> String -> String -> String
+applyIfThenElse condSmt thenSmt elseSmt =
+    "(ite" ++ " " ++ condBvSmt ++ " " ++ thenSmt ++ " " ++ elseSmt ++ ")"
+    where
+        condBvSmt = fromBvToBoolSmt condSmt
 
 fromBvToBoolSmt :: BvSMT -> BoolSMT
 fromBvToBoolSmt =
@@ -40,40 +45,65 @@ fromSSA :: SSA Op NewId -> [String]
 fromSSA ssa =
     [ "(set-logic QF_BV)"
     , "(set-option :produce-models true)"
+    , ""
     , "(define-fun tobv32 ((p Bool)) (_ BitVec 32)"
     , "     (ite p (_ bv1 32) (_ bv0 32)))"
     , "(define-fun tobool ((p (_ BitVec 32))) Bool"
     , "     (ite (= p (_ bv0 32)) false true))"
     , ""
+    , "(define-fun mysdiv ((l (_ BitVec 32))) ((r (_ BitVec 32))) (_ BitVec 32)"
+    , "     (ite (= r (_ bv0 32)) l (bvsdiv l r)))"
+    , "(define-fun mysmod ((l (_ BitVec 32))) ((r (_ BitVec 32))) (_ BitVec 32)"
+    , "     (ite (= r (_ bv0 32)) l (bvsmod l r)))"
+    , "(define-fun myshl ((l (_ BitVec 32))) ((r (_ BitVec 32))) (_ BitVec 32)"
+    , "     (ite (or (>= r (_ bv32 32)) (< r (_ bv0 32))) l (bvshl l r)))"
+    , "(define-fun myashr ((l (_ BitVec 32))) ((r (_ BitVec 32))) (_ BitVec 32)"
+    , "     (ite (or (>= r (_ bv32 32)) (< r (_ bv0 32))) l (bvashr l r)))"
+    , ""
     ] ++
 
-    decls ++
+    -- variables declaration
+    map (\idSMT ->
+        "(declare-fun " ++ idSMT ++ " () (_ BitVec 32))") (Set.toList idSMTs) ++
     [""] ++
-    asserts ++
+
+    -- assignments
+    map (applyFuncSmt "assert") assigns ++
+    [""] ++
+
+    -- assertions
+    [ "(asserts (not" ] ++
+    map ("(and " ++) asserts ++
+    [ "true"
+    , replicate (length asserts) ')'
+    , "))"
+    ] ++
 
     [ ""
     , "(check-sat)"
     ]
     where
-        (asserts, idSMTsList) = unzip $ map fromSSAAlt ssa
-        decls = map
-            (\idSMT -> "(declare-fun " ++ idSMT ++ " () (_ BitVec 32))" )
-            ((nub . concat) idSMTsList)
+        (assigns, asserts, idSMTs) = foldr partitionSSA ([], [], Set.empty) ssa
 
-fromSSAAlt :: SSAAlt NewId (NewExpr Op NewId) -> (BoolSMT, [IdSMT])
-fromSSAAlt (SSAAssign nID newE) =
-    ("(assert (= " ++ idSMT ++ " " ++ bvSmt ++ "))", idSMT : idSMTs)
+-- ([BoolSMT], [BoolSMT], IdSMT) is (assignments, assertions, smt idents)
+partitionSSA :: SSAAlt NewId (NewExpr Op NewId)
+                    -> ([BoolSMT], [BoolSMT], IdSMTs) 
+                    -> ([BoolSMT], [BoolSMT], IdSMTs)
+partitionSSA (SSAAssign nID newE) (assigns, asserts, idSMTs) =
+    (assign : assigns, asserts, Set.union idSMTs $ Set.insert idSMT  idSMTs')
     where
         idSMT = newIdToIdSMT nID
-        (bvSmt, idSMTs) = fromNewExpr newE
-fromSSAAlt (SSAAssert newE) =
-    ("(assert " ++ fromBvToBoolSmt bvSmt ++ ")", idSMTs)
+        (bvSmt, idSMTs') = fromNewExpr newE
+        assign = apply2FuncSmt "=" idSMT bvSmt
+partitionSSA (SSAAssert newE) (assigns, asserts, idSMTs) =
+    (assigns, assert : asserts, Set.union idSMTs idSMTs')
     where
-        (bvSmt, idSMTs) = fromNewExpr newE
+        (bvSmt, idSMTs') = fromNewExpr newE
+        assert = fromBvToBoolSmt bvSmt
 
-fromNewExpr :: NewExpr Op NewId -> (BvSMT, [IdSMT])
+fromNewExpr :: NewExpr Op NewId -> (BvSMT, IdSMTs)
 fromNewExpr (NEBinOp op lNewE rNewE) =
-    (bvSmt, lIdSMTs ++ rIdSMTs)
+    (bvSmt, Set.union lIdSMTs rIdSMTs)
     where
         (lBvSmt, lIdSMTs) = fromNewExpr lNewE
         (rBvSmt, rIdSMTs) = fromNewExpr rNewE
@@ -81,46 +111,46 @@ fromNewExpr (NEBinOp op lNewE rNewE) =
 fromNewExpr (NE newE) =
     fromExpr newE
 fromNewExpr (lNewE :=> rNewE) =
-    (bvSmt, lIdSMTs ++ rIdSMTs)
+    (bvSmt, Set.union lIdSMTs rIdSMTs)
     where
         (lBvSmt, lIdSMTs) = fromNewExpr lNewE
         (rBvSmt, rIdSMTs) = fromNewExpr rNewE
         bvSmt = fromBoolBinOp "=>" lBvSmt rBvSmt
 
-fromExpr :: Expr Op NewId -> (BvSMT, [IdSMT])
+fromExpr :: Expr Op NewId -> (BvSMT, IdSMTs)
 --fromExpr (EShortIf condE thenE elseE) =
 fromExpr (EBinOp SIfCond (BinOp condE (EBinOp SIfAlt (BinOp thenE elseE)))) =
-    (result, concat idSMTsList)
+    (result, Set.unions idSMTsList)
     where
         ([condSmt, thenSmt, elseSmt], idSMTsList)
             = unzip $ map fromExpr [condE, thenE, elseE]
-        result = apply3FuncSmt "ite" (fromBvToBoolSmt condSmt) thenSmt elseSmt
+        result = applyIfThenElse condSmt thenSmt elseSmt
 fromExpr (EUnOp op (UnOp expr)) =
     (fromUnOp op bvSmt, idSMTs)
     where
         (bvSmt, idSMTs) = fromExpr expr
 fromExpr (EBinOp op (BinOp lExpr rExpr)) =
-    (fromBinOp op lBvSmt rBvSmt, lIdSMTs ++ rIdSMTs)
+    (fromBinOp op lBvSmt rBvSmt, Set.union lIdSMTs rIdSMTs)
     where
         (lBvSmt, lIdSMTs) = fromExpr lExpr
         (rBvSmt, rIdSMTs) = fromExpr rExpr
 fromExpr (ELit n) =
-    ("(_ bv" ++ show n ++ " 32)", [])
+    ("(_ bv" ++ show n ++ " 32)", Set.empty)
 fromExpr (EID id) =
-    (idSMT, [idSMT])
+    (idSMT, Set.singleton idSMT)
     where
         idSMT = newIdToIdSMT id
 --fromExpr EResult | TODO
 --fromExpr EOld
 
 fromBinOp :: Op -> BvSMT -> BvSMT -> BvSMT
-fromBinOp Mul = apply2FuncSmt "bvmul"
-fromBinOp Div = apply2FuncSmt "bvsdiv"
 fromBinOp Add = apply2FuncSmt "bvadd"
 fromBinOp Sub = apply2FuncSmt "bvsub"
-fromBinOp Mod = apply2FuncSmt "bvsmod"
-fromBinOp LShift = apply2FuncSmt "bvshl"
-fromBinOp RShift = apply2FuncSmt "bvashr"
+fromBinOp Mul = apply2FuncSmt "bvmul"
+fromBinOp Div = apply2FuncSmt "mysdiv"
+fromBinOp Mod = apply2FuncSmt "mysmod"
+fromBinOp LShift = apply2FuncSmt "myshl"
+fromBinOp RShift = apply2FuncSmt "myashr"
 fromBinOp BitXOr = apply2FuncSmt "bvxor"
 fromBinOp BitAnd = apply2FuncSmt "bvand"
 fromBinOp BitOr = apply2FuncSmt "bvor"

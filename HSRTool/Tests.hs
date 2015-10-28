@@ -5,7 +5,7 @@ import HSRTool.Parser.Types
 import Control.Monad.Error
 import HSRTool.CodeGen.CGExpr
 import HSRTool.CodeGen.Types
-import HSRTool.CodeGen.SSAFrom
+--import HSRTool.CodeGen.SSAForm
 import HSRTool.CodeGen.SMTForm
 import Control.Applicative
 
@@ -23,15 +23,15 @@ runParserTest p = readFile (cPrefix </> p) >>= return . parse
 
 type Env = Either String (SSAEval String ())
 
---runSSAGenTest :: String -> IO (SSA Op NewId)
---runSSAGenTest p = do
---    res <- runParserTest p
---    either (\_ -> return []) runSSAGenerator res
-
 runSSAGenTest :: String -> IO (SSA Op NewId)
 runSSAGenTest p = do
     res <- runParserTest p
-    return fromProg res
+    either (\_ -> return []) runSSAGenerator res
+
+--runSSAGenTest :: String -> IO (SSA Op NewId)
+--runSSAGenTest p = do
+--    res <- runParserTest p
+--    return fromProg res
 
 runSMTGenTest :: String -> IO ([String])
 runSMTGenTest p =
