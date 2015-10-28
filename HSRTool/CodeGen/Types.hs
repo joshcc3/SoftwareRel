@@ -2,6 +2,7 @@
 
 module HSRTool.CodeGen.Types where
 
+import qualified Data.Map as M
 import HSRTool.Parser.Types
 import Control.Monad
 import Control.Monad.Free
