@@ -162,7 +162,13 @@ data Stmt id a = SVarDecl { _svdVDecl :: (VarDecl id a) } |
             SBlockStmt' { _sbAInfo :: (Either' a, Either' a),
                           _sbBlockStmt' :: [Stmt id a] } |
             SIfStmt' { _sifIfStmt' :: IfStmt' id a }
-            deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
+            deriving (Eq, Ord, Show, Read, Functor)
+
+instance Foldable (Stmt id) where
+    foldMap = bifoldMap (const mempty)
+
+instance Traversable (Stmt id) where
+    traverse = bitraverse pure
 
 instance Bifunctor Stmt where
     bimap f g (SVarDecl d) = SVarDecl (bimap f g d)
@@ -186,11 +192,13 @@ instance Bitraversable Stmt where
     bitraverse f g (SHavocStmt h) = SHavocStmt <$> (bitraverse f g h)
     bitraverse f g (SIfStmt i) = SIfStmt <$> (bitraverse f g i)
     bitraverse f g (SBlockStmt a s) = SBlockStmt <$> (g a) <*> (traverse (bitraverse f g) s)
-    bitraverse f g (SBlockStmt' a s) 
-        = SBlockStmt' <$> 
-          bitraverse (traverse g) (traverse g) a
+    bitraverse f g (SBlockStmt' (l, r) s) 
+        = h <$> 
+          traverse g l
           <*> traverse (bitraverse f g) s
-
+          <*> traverse g r
+              where 
+                h x y z = SBlockStmt' (x, z) y
 data AssignStmt id a = AssignStmt {
       _assInfo :: a,
       _assgnID :: id,
@@ -442,3 +450,18 @@ instance Comonad (Stmt id) where
     duplicate s@(SIfStmt' (IfStmt' a ex t th e el exit))
         = SIfStmt' (IfStmt' s ex undefined undefined undefined undefined undefined)
 
+       
+
+scanlC :: (Comonad f, Traversable f, Monoid a) => f a -> f a
+scanlC s = fst . flip runState mempty . traverse id $ s =>> f
+    where 
+      f x = do
+        st <- get
+        put (st<>extract x)
+        get
+
+integrate :: (Traversable f, Comonad f) => f (a -> a) -> a -> f a
+integrate = distribute . 
+            fmap (appEndo . getDual) . 
+            scanlC . 
+            fmap (Dual . Endo)
