@@ -10,7 +10,7 @@ import Data.Monoid
 import Control.Applicative
 import qualified Data.Set as S
 import Control.Lens
-import HSRTool.CodeGen.Types
+import HSRTool.CodeGen.Types hiding (NewId(..), count)
 import HSRTool.Parser.Types
 import Control.Monad.State
 import Control.Monad.Writer
@@ -68,7 +68,7 @@ toSSA (SAssertStmt (AssertStmt _ e)) p = do
   let mp = _m st
       assmpts = _ass st
   tell [SSAAssert ((NEBinOp LAnd (NE p) assmpts) :=> NE (apply e mp))]
-toSSA (SBlockStmt _ l) p = mapM_ (flip toSSA p) l
+toSSA (SBlockStmt _ l) p = mapM_ (\x -> toSSA x p) l
 toSSA (SIfStmt (IfStmt _ e tn (Just el))) p = do
   st      <- get
   let mp  = _m st
@@ -77,19 +77,19 @@ toSSA (SIfStmt (IfStmt _ e tn (Just el))) p = do
   st'     <- get
   let m'  = _m st'
   m .= mp
-  mapM_ (flip toSSA (EBinOp LAnd  (Pair p (EUnOp LNot (UnOp newPred))))) el
+  mapM_ (\x -> toSSA x (EBinOp LAnd  (Pair p (EUnOp LNot (UnOp newPred))))) el
   st''    <- get
   let g v = do
         newId <- fresh v
         m.ix v .= newId
-        tell [SSAAssign newId (NE $ EShortIf newPred (EID $ (lkup m' v)) (EID $ lkup m'' v))]
+        tell [SSAAssign newId (NE $ EShortIf newPred (EID $ lkup m' v) (EID $ lkup m'' v))]
       m'' = _m st''
   mapM_ g (S.elems (S.union (foldMap modset tn) (foldMap modset el)))
 toSSA (SIfStmt (IfStmt _ e tn Nothing)) p = do
   st <- get
   let mp = _m st
       newPred = apply e mp
-  mapM_ (flip toSSA (EBinOp LAnd (Pair p newPred))) tn
+  mapM_ (\x -> toSSA x (EBinOp LAnd (Pair p newPred))) tn
   st' <- get
   let
       g v = do

@@ -2,16 +2,11 @@
 
 module HSRTool.CodeGen.Types where
 
+import qualified Data.Map as M
 import HSRTool.Parser.Types
 import Control.Monad
 import Control.Monad.Free
 import Control.Lens
-
-
-data SSAF a e n = SSAFAssign a e n | SSAFAssert e n
-                  deriving (Eq, Read, Ord, Show, Functor)
-
-type SSA' id' id = Free (SSAF id' (Expr Op id))
 
 
 data SSAAlt id e = SSAAssign id e | SSAAssert e

@@ -22,7 +22,6 @@ correctPrefix = "tests/correct"
 (</>) a b = concat [a, "/", b]
 runParserTest p = readFile p >>= return . parse
 
-
 type Env = Either String (SSAEval String ())
 
 runSSAGenTest :: String -> IO (SSA Op NewId)
