@@ -1,8 +1,8 @@
 {-# LANGUAGE LambdaCase, TemplateHaskell #-}
 
-module HSRTool.CodeGen.IntermStmt(genIntermStmt, St'(..)) where
+module HSRTool.CodeGen.IntermStmt(updateState, subst, stmt, St'(..)) where
 
-import HSRTool.Parser.Types
+import HSRTool.Parser.Types as T
 import Control.Monad.State
 import Data.Distributive
 import Data.Traversable
@@ -28,39 +28,38 @@ data St' = St' {
     } deriving (Eq, Ord, Show, Read)
 makeLenses ''St'
 
-upd id = Just . maybe freshId updateId
-    where 
-      freshId = ([NewId id 1], 2)
-      updateId x =  x & _1.ix 0.count .~ view _2 x & _2 %~ (+1)
-
-mapDiff :: Stmt String a -> State St' Mp
-mapDiff (SVarDecl (VarDecl _ id)) = do
+updateState id = do
   mp %= M.alter (upd id) id
   _mp <$> get
-mapDiff (SAssignStmt (AssignStmt _ id _)) = do
-  mp %= M.alter (upd id) id
-  _mp <$> get
-mapDiff (SHavocStmt (HavocStmt _ id)) = do
-  mp %= M.alter (upd id) id
-  _mp <$> get
-mapDiff (SBlockStmt' (Either' (Left _), _) _) = do
+      where 
+        upd id = Just . maybe (freshId id) updateId
+        freshId id = ([NewId id 1], 2)
+        updateId id =  id & _1.ix 0.count .~ view _2 id & _2 %~ (+1)
+    
+openScope = do
   mp.traverse._1 %= g
   _mp <$> get
-      where 
-        g [] = []
-        g (x:xs) = x:x:xs
-mapDiff (SBlockStmt' (Either' (Right _), _) _) = do
+    where 
+      g [] = []
+      g (x:xs) = x:x:xs
+
+closeScope = do
   mp %= M.mapMaybe g
   _mp <$> get
-      where 
-        g ([], _) = Nothing
-        g (_:[], _) = Nothing
-        g x = Just (x & _1 %~ tail)
-mapDiff _ = _mp <$> get
+    where 
+      g ([], _) = Nothing
+      g (_:[], _) = Nothing
+      g x = Just (x & _1 %~ tail)
 
-genIntermStmt :: Stmt String a -> State St' (Stmt NewId Mp)
-genIntermStmt prog = bitraverse subst id (prog =>> mapDiff)
-
+stmt :: Stmt String a -> Stmt String (State St' Mp)    
+stmt s = s =>> stmtAction
+    where 
+      stmtAction (SVarDecl (VarDecl _ id)) = updateState id
+      stmtAction (SAssignStmt (AssignStmt _ id _)) = updateState id
+      stmtAction (SHavocStmt (HavocStmt _ id)) = updateState id
+      stmtAction (SBlockStmt (Either' (Left _), _) _) = openScope
+      stmtAction (SBlockStmt (Either' (Right _), _) _) = closeScope
+      stmtAction _ = _mp <$> get
 
 subst :: String -> State St' NewId
 subst s = do
@@ -76,3 +75,31 @@ lkup mp var | null val = error "No variable defined in scope"
              fst
              (M.lookup var mp)
 
+
+vdecl :: VarDecl String a -> VarDecl String (State St' Mp)
+vdecl v = v & vInfo .~ updateState (T._varId v)
+
+fparams :: FormalParam String a -> FormalParam String (State St' Mp)
+fparams v = v & fpInfo .~ updateState (_fID v)
+
+prePost :: PrePost id a -> PrePost id (State St' Mp)
+prePost p = (_mp <$> get) <$ p
+
+genIntermProg :: ProcedureDecl String a -> State St' (ProcedureDecl NewId Mp)
+genIntermProg procDecl = undefined -- bitraverse subst id (procedureDecl procDecl)
+
+procedureDecl :: ProcedureDecl' Mp String a -> ProcedureDecl' Mp String (State St' Mp)
+procedureDecl p  
+    =  undefined {-PDecl 
+      (updateState (_pId p)) 
+      (_pId p) 
+      (map fparams (_pFParams p))
+      (map prePost (_pPrepost p)) 
+      (map stmt (_pStmts p))
+      (_pExpr p)-}
+
+{-program p
+      = Program
+        get
+        (map vdecl (_pVarDecls p))
+        (map -}
