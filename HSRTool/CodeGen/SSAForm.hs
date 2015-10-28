@@ -11,16 +11,6 @@ import HSRTool.Parser.Types
 
 -------------------------------------------------------------------------------
 
-type Ident = String
-type IdNum = Int
-
-data NewId = NewId {
-      _count :: IdNum,
-      _newVarId :: Ident
-} deriving (Eq, Ord, Show, Read)
-
-makeLenses ''NewId
-
 data VarScopeInfo
     = VarScopeOuter          -- this variable come from outer scope
     | VarScopeDecl           -- this variable is declared in this scope
@@ -28,13 +18,11 @@ data VarScopeInfo
                              -- but got redeclared in this scope
                              -- `IdNum` represent last idnum of outer variable
 
--------------------------------------------------------------------------------
-
 -- map of the least id that hasn't been used
 type FreshDict = Map.Map Ident IdNum
 
-fresh :: Ident -> FreshDict -> (IdNum, FreshDict)
-fresh ident freshDict =
+getFreshIdNum :: Ident -> FreshDict -> (IdNum, FreshDict)
+getFreshIdNum ident freshDict =
     (idnum, freshDict')
     where
         idnum = Maybe.fromMaybe 0 $ Map.lookup ident freshDict
@@ -43,64 +31,80 @@ fresh ident freshDict =
 -- each value store current id and info about scope for each variable
 type ScopeDict = Map.Map Ident (IdNum, VarScopeInfo)
 
-lookup :: Ident -> ScopeDict -> IdNum
-lookup ident scopeDict =
-    fst $ Maybe.fromMaybe err $ Map.lookup ident scopeDict
+getScopeIdNum :: Ident -> ScopeDict -> IdNum
+getScopeIdNum ident scopeDict =
+    Maybe.fromMaybe err $ fmap fst $ Map.lookup ident scopeDict
     where
-        err = error "Attempt to access undefined variable " ++
-                    "named \"" ++ ident ++ "\"."
+        err = error $ "Attempt to access undefined variable " ++
+                      "named \"" ++ ident ++ "\"."
 
-lookupOuter :: Ident -> ScopeDict -> IdNum
-lookupOuter ident scopeDict =
-    case Map.lookup ident scopeDict of
-        Nothing -> err
-        Just (_,)
+--lookupOuter :: Ident -> ScopeDict -> IdNum
+--lookupOuter ident scopeDict =
+--    case Map.lookup ident scopeDict of
+--        Nothing -> err
+--        Just (_,)
 
-    fst $ Maybe.fromMaybe err $ Map.lookup ident scopeDict
-    where
-        err = error "There is no outer variable named \"" ++ ident ++ "\"."
+--    fst $ Maybe.fromMaybe err $ Map.lookup ident scopeDict
+--    where
+--        err = error "There is no outer variable named \"" ++ ident ++ "\"."
 
-applyExpr :: Expr Op Ident -> ScopeDict -> Expr Op NewId
-applyExpr (EShortIf condE thenE elseE) scopeDict =
-    EShortIf (applyExpr condE) (applyExpr thenE) (applyExpr elseE)
-applyExpr EBinOp op (BinOp lExpr rExpr) scopeDict =
-    EBinOp op (BinOp (applyExpr lExpr) (applyExpr rExpr))
-applyExpr EUnOp op (UnOp expr) scopeDict =
-    EUnOp op (applyExpr expr)
-applyExpr ELit n scopeDict = ELit n
-applyExpr EID ident scopeDict =
-    EID {_count = lookup ident scopeDict, _newVarId = ident}
+applyExpr :: ExprAST -> ScopeDict -> ScopeDict -> ExprSSA
+applyExpr (EShortIf condE thenE elseE) scopeDict globalOldDict =
+    EShortIf
+        (applyExpr condE scopeDict globalOldDict)
+        (applyExpr thenE scopeDict globalOldDict)
+        (applyExpr elseE scopeDict globalOldDict)
+applyExpr (EBinOp op (BinOp lExpr rExpr)) scopeDict globalOldDict =
+    EBinOp op
+        (BinOp (applyExpr lExpr scopeDict globalOldDict)
+        (applyExpr rExpr scopeDict globalOldDict))
+applyExpr (EUnOp op (UnOp expr)) scopeDict globalOldDict =
+    EUnOp op (UnOp $ applyExpr expr scopeDict globalOldDict)
+applyExpr (ELit n) scopeDict globalOldDict =
+    ELit n
+applyExpr (EID ident) scopeDict globalOldDict =
+    EID $ NewId (getScopeIdNum ident scopeDict) ident
 -- we can use word return since it is not valid identifier name (reserved word)
-applyExpr EResult scopeDict =
-    EID {_count = lookup "return" scopeDict, _newVarId = "return"}
-applyExpr EOld ident scopeDict =
-    EID {_count = lookup "return" scopeDict, _newVarId = "return"}
-
-type ScopeFreshDict = (ScopeDict, FreshDict)
+applyExpr EResult scopeDict globalOldDict =
+    EID $ NewId (getScopeIdNum "return" scopeDict) "return"
+applyExpr (EOld ident) scopeDict globalOldDict =
+    EID $ NewId (getScopeIdNum ident globalOldDict) ident
 
 -------------------------------------------------------------------------------
 
-fromProg :: Program String a -> SSA Op NewId
-fromProg (Program _ pVarDecls pPDecls) =
-    undefined
+fromProg :: Program Ident a -> StmtSSAs
+fromProg (Program _ varDecls procDecls) =
+    ssa
     where
-        initScopeFreshDict = (Map.empty, Map.empty)
         (scopeDict, freshDict) =
-            foldl (flip fromVarDecl) initScopeFreshDict pVarDecls
+            foldl (flip fromVarDecl) (Map.empty, Map.empty) varDecls
+        (ssa, _) =
+            foldl (flip $ (flip fromProcedureDecl) scopeDict)
+                 ([], freshDict) procDecls
 
-        pVarDeclFunc 
-        foldl
-
-fromVarDecl :: VarDecl String a -> ScopeFreshDict -> ScopeFreshDict
+fromVarDecl :: VarDecl Ident a ->
+                   (ScopeDict, FreshDict) -> (ScopeDict, FreshDict)
 fromVarDecl (VarDecl _ ident) (scopeDict, freshDict) =
     (scopeDict', freshDict')
     where
-        (curIdNum, freshDict') = fresh freshDict
+        (curIdNum, freshDict') = getFreshIdNum ident freshDict
         varScopeInfo = case Map.lookup ident scopeDict of
             Nothing -> VarScopeDecl
             Just (prevIdnum, VarScopeOuter) -> VarScopeReDecl prevIdnum
-            Just (_, _) -> error "Attempt to declared variable \""
+            Just (_, _) -> error $ "Attempt to declared variable \""
                            ++ ident ++ "\" twice on the same scope."
-        scopeDict' = Map.lookup ident (curIdNum, varScopeInfo) scopeDict
+        scopeDict' = Map.insert ident (curIdNum, varScopeInfo) scopeDict
 
-fromProcedureDecl :: 
+fromProcedureDecl :: ProcedureDecl Ident a -> ScopeDict
+                         -> (StmtSSAs, FreshDict) -> (StmtSSAs, FreshDict)
+fromProcedureDecl (PDecl _ ident formalParams prePosts stmts retExpr)
+        scopeDict (ssa, freshDict) =
+    undefined -- TODO
+
+
+fromStmt :: StmtAST -> PropSSAs -> PropSSAs
+                -> ScopeDict -> FreshDict -> (StmtSSAs, FreshDicts)
+fromStmt (SVarDecl _ varDecls) preds assums scopeDict freshDict =
+
+    where
+        (scopeDict', freshDict') = fromVarDecl varDecls (scopeDict, freshDict)

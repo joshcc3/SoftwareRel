@@ -41,7 +41,7 @@ fromBoolToBvSmt :: BoolSMT -> BvSMT
 fromBoolToBvSmt =
     applyFuncSmt "tobv32"
 
-fromSSA :: SSA Op NewId -> [String]
+fromSSA :: StmtSSAs -> [String]
 fromSSA ssa =
     [ "(set-logic QF_BV)"
     , "(set-option :produce-models true)"
@@ -86,7 +86,7 @@ fromSSA ssa =
         (assigns, asserts, idSMTs) = foldr partitionSSA ([], [], Set.empty) ssa
 
 -- ([BoolSMT], [BoolSMT], IdSMT) is (assignments, assertions, smt idents)
-partitionSSA :: SSAAlt NewId (NewExpr Op NewId)
+partitionSSA :: SSAAlt NewId NewExprSSA
                     -> ([BoolSMT], [BoolSMT], IdSMTs) 
                     -> ([BoolSMT], [BoolSMT], IdSMTs)
 partitionSSA (SSAAssign nID newE) (assigns, asserts, idSMTs) =
@@ -101,7 +101,7 @@ partitionSSA (SSAAssert newE) (assigns, asserts, idSMTs) =
         (bvSmt, idSMTs') = fromNewExpr newE
         assert = fromBvToBoolSmt bvSmt
 
-fromNewExpr :: NewExpr Op NewId -> (BvSMT, IdSMTs)
+fromNewExpr :: NewExprSSA -> (BvSMT, IdSMTs)
 fromNewExpr (NEBinOp op lNewE rNewE) =
     (bvSmt, Set.union lIdSMTs rIdSMTs)
     where
@@ -117,7 +117,7 @@ fromNewExpr (lNewE :=> rNewE) =
         (rBvSmt, rIdSMTs) = fromNewExpr rNewE
         bvSmt = fromBoolBinOp "=>" lBvSmt rBvSmt
 
-fromExpr :: Expr Op NewId -> (BvSMT, IdSMTs)
+fromExpr :: ExprSSA -> (BvSMT, IdSMTs)
 --fromExpr (EShortIf condE thenE elseE) =
 fromExpr (EBinOp SIfCond (BinOp condE (EBinOp SIfAlt (BinOp thenE elseE)))) =
     (result, Set.unions idSMTsList)

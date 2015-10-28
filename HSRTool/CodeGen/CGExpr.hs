@@ -17,10 +17,10 @@ import Data.Foldable (foldMap)
 type Assumption = NewExpr
 type Pred = Expr
 type M id id' = M.Map id id'
-data NewId = NewId {
-      _count :: Int,
-      _newVarId :: String
-} deriving (Eq, Ord, Show, Read)
+--data NewId = NewId {
+--      _count :: Int,
+--      _newVarId :: String
+--} deriving (Eq, Ord, Show, Read)
 makeLenses ''NewId
 data St id id' = St {
       _m :: M id id',

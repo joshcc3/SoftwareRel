@@ -3,9 +3,9 @@ module HSRTool.Tests where
 import HSRTool.Parser.Parser
 import HSRTool.Parser.Types
 import Control.Monad.Error
-import HSRTool.CodeGen.CGExpr
+--import HSRTool.CodeGen.CGExpr
 import HSRTool.CodeGen.Types
---import HSRTool.CodeGen.SSAForm
+import HSRTool.CodeGen.SSAForm (fromProg)
 import HSRTool.CodeGen.SMTForm
 import Control.Applicative
 
@@ -21,17 +21,17 @@ cPrefix = "tests/correct"
 (</>) a b = concat [a, "/", b]
 runParserTest p = readFile (cPrefix </> p) >>= return . parse
 
-type Env = Either String (SSAEval String ())
-
-runSSAGenTest :: String -> IO (SSA Op NewId)
-runSSAGenTest p = do
-    res <- runParserTest p
-    either (\_ -> return []) runSSAGenerator res
+--type Env = Either String (SSAEval String ())
 
 --runSSAGenTest :: String -> IO (SSA Op NewId)
 --runSSAGenTest p = do
 --    res <- runParserTest p
---    return fromProg res
+--    either (\_ -> return []) runSSAGenerator res
+
+runSSAGenTest :: String -> IO (StmtSSAs)
+runSSAGenTest p = do
+    res <- runParserTest p
+    return $ either (\_ -> []) fromProg res
 
 runSMTGenTest :: String -> IO ([String])
 runSMTGenTest p =
