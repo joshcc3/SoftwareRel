@@ -3,6 +3,7 @@
   DeriveFoldable, 
   DeriveTraversable, 
   GeneralizedNewtypeDeriving,
+  TypeSynonymInstances,
   TemplateHaskell #-}
 
 module HSRTool.Parser.Types where
@@ -48,6 +49,11 @@ instance Traversable Either' where
     traverse f (Either' (Left x)) = (Either' . Left) <$> f x
     traverse f (Either' (Right x)) = (Either' . Right) <$> f x
 
+instance Comonad Either' where
+    extract = either' id id
+    duplicate s = s <$ s
+
+
 data ZList a = ZList { leftZ :: [a], rightZ :: [a] } 
                deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
 
@@ -85,10 +91,10 @@ data Expr op id = EShortIf (Expr op id) (Expr op id) (Expr op id) |
 makePrisms ''Expr
 makeLenses ''Expr
 
-data Program id a = Program {
+data Program a' id a = Program {
       _pInfo :: a,
-      _pVarDecls :: [VarDecl id a],
-      _pPDecls :: [ProcedureDecl id a]
+      _pVarDecls :: [VarDecl id a'],
+      _pPDecls :: [ProcedureDecl id a']
 } deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
 
 data VarDecl id a = VarDecl {
@@ -105,27 +111,68 @@ instance Bifunctor VarDecl where
 instance Bitraversable VarDecl where
     bitraverse f g (VarDecl a id) = VarDecl <$> g a <*> f id
 
-data ProcedureDecl id a = PDecl {
-      _pdeclInfo :: a,
+type ProcedureDecl id a = ProcedureDecl' a id a
+data ProcedureDecl' a' id a = PDecl {
+      _pdeclInfo :: (Either' a, Either' a),
       _pId :: id,
-      _pFParams :: [FormalParam id a],
-      _pPrepost :: [PrePost id a],
-      _pStmts :: [Stmt id a],
+      _pFParams :: [FormalParam id a'],
+      _pPrepost :: [PrePost id a'],
+      _pStmts :: [Stmt id a'],
       _pExpr :: Expr Op id
-} deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
+} deriving (Eq, Ord, Show, Read, Functor)
 
-instance Bifoldable ProcedureDecl where
-    bifoldMap f g b = fold (bimap f g b)
+newtype ProcedureDeclT id a = PD { getPDecl :: ProcedureDecl' a id a }
+    deriving (Eq, Ord, Read, Show)
 
-instance Bifunctor ProcedureDecl where
-    bimap f g (PDecl a id fp pp sts e) 
-        = PDecl (g a) (f id) (map (bimap f g) fp) (map (bimap f g) pp) 
-           (map (bimap f g) sts) (fmap f e)
+instance Functor (ProcedureDeclT id) where
+    fmap = bimap id
 
-instance Bitraversable ProcedureDecl where
-    bitraverse f g (PDecl a id fp pp sts e) 
-        = PDecl <$> (g a) <*> (f id) <*> (traverse (bitraverse f g) fp) <*> (traverse (bitraverse f g) pp) <*>
-           (traverse (bitraverse f g) sts) <*> (traverse f e)
+instance Bifunctor ProcedureDeclT where
+    bimap f g (PD (PDecl (l,r) i fp pp sts e)) 
+        = PD (PDecl (fmap g l, fmap g r) 
+                    (f i) 
+                    (fmap (bimap f g) fp) 
+                    (fmap (bimap f g) pp)
+                    (fmap (bimap f g) sts) 
+                    (fmap f e)
+             )
+
+instance Foldable (ProcedureDeclT id) where
+    foldMap = bifoldMap (const mempty)
+
+instance Bifoldable ProcedureDeclT where
+    bifoldMap f g (PD (PDecl (l, r) id fp pp sts e)) = 
+        foldMap g l
+        <> f id 
+        <> foldMap (bifoldMap f g) fp
+        <> foldMap (bifoldMap f g) pp
+        <> foldMap (bifoldMap f g) sts
+        <> foldMap f e
+        <> foldMap g r
+
+instance Bitraversable ProcedureDeclT where
+    bitraverse f g (PD (PDecl a vId fp pp sts e))
+        = PD <$> 
+          (PDecl <$>
+               bitraverse (traverse g) (traverse g) a
+           <*> f vId
+           <*> traverse (bitraverse f g) fp
+           <*> traverse (bitraverse f g) pp
+           <*> traverse (bitraverse f g) sts
+           <*> traverse f e)
+
+instance Traversable (ProcedureDeclT id) where
+    traverse = bitraverse pure
+
+instance Comonad (ProcedureDecl' a' id) where
+    extract = extract . fst . _pdeclInfo
+    duplicate s 
+        = s { _pdeclInfo = a }
+          where 
+            (l, r) = _pdeclInfo s
+            a = (s <$ l, s' <$ r)
+            s' = s { _pdeclInfo = (r, l) }
+
 
 data FormalParam id a = FParam { _fpInfo :: a, _fID :: id }
                       deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
@@ -324,7 +371,7 @@ makeLenses ''PrePost
 makePrisms ''Stmt
 makeLenses ''Stmt
 makeLenses ''FormalParam
-makeLenses ''ProcedureDecl
+makeLenses ''ProcedureDecl'
 makeLenses ''AssignStmt
 makeLenses ''AssumeStmt
 makeLenses ''AssertStmt
@@ -383,7 +430,7 @@ instance Applicative (Expr op) where
 
 instance Comonad Pair where
     extract (Pair x _) = x
-    duplicate (Pair x x') = Pair (Pair x' x) (Pair x x')
+    duplicate (Pair x x') = Pair (Pair x x') (Pair x' x)
 
 instance Monad Pair where
   return x = Pair x x
@@ -443,8 +490,6 @@ instance Comonad (Stmt id) where
             s' = s & sbAInfo %~ swap
     duplicate s@(SIfStmt' (IfStmt' a ex t th e el exit))
         = SIfStmt' (IfStmt' s ex undefined undefined undefined undefined undefined)
-
-       
 
 scanlC :: (Comonad f, Traversable f, Monoid a) => f a -> f a
 scanlC s = fst . flip runState mempty . traverse id $ s =>> f

@@ -33,7 +33,7 @@ makeLenses ''St
 runStack :: b -> StateT b (WriterT w m) a -> m ((a, b), w)
 runStack s = runWriterT . flip runStateT s
 
-runSSAGenerator :: Program String a -> IO (SSA Op NewId)
+runSSAGenerator :: Program a String a -> IO (SSA Op NewId)
 runSSAGenerator (Program _ vD pD) = do
   o <- runStack initSt pDecls
   return (snd o)

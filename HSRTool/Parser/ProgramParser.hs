@@ -30,7 +30,7 @@ stmts = string ocurlyT *> many space *>
 rExpr = many space *>
         parseExpr
         <* many space <* string semicolonT <* many space <* string ccurlyT <* many space
-pDecl = PDecl () <$>
+pDecl = PDecl (Either' (Left ()), Either' (Right ())) <$>
               declIdent <*>
               fParams <*>
               ppConds <*>
