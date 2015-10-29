@@ -177,3 +177,4 @@ randomStream r = do
   x <- SR.newStdGen
   let s = snd $ SR.genRange x
   return $ map ((`div`s) . (*r) . fst) (iterate (SR.next . snd) (SR.next x))
+
