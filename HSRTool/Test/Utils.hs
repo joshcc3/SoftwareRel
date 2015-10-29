@@ -41,3 +41,4 @@ runSSAGenTest p = do
 runSMTGenTest :: String -> IO ([String])
 runSMTGenTest p =
     fromSSA <$> runSSAGenTest p
+

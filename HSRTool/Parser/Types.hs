@@ -546,3 +546,10 @@ zipWithAltList _ f (Centre x) (Outer a _ b) = Centre (f x a)
 zipWithAltList _ f (Outer a _ _) (Centre x) = Centre (f a x)
 zipWithAltList f g (Outer a m b) (Outer c m' d)
     = Outer (g a c) (zipWithAltList g f m m') (g b d)
+
+
+pos :: Int -> a -> Either' (Either' a)
+pos = (l !!)
+    where 
+      l' = [Either' . Left, Either' . Right]
+      l = (.) <$> l' <*> l'

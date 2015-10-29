@@ -79,7 +79,12 @@ stmt s = s =>> stmtAction
       stmtAction (SBlockStmt (e,_) _) 
           = either' (\_ -> openScope) (\_ -> closeScope) e
       stmtAction (SIfStmt' a)
-          = undefined
+          = either' (either' enterIf atThen) (either' atElse exitIf) (extract a)
+            where 
+              enterIf = (\_ -> _mp <$> get)
+              atThen = (\_ -> openScope)
+              atElse = (\_ -> closeScope >> openScope)
+              exitIf = (\_ -> closeScope)
       stmtAction _ = _mp <$> get
 
 vdecl :: VarDecl String a -> VarDecl String (State St' Mp)
