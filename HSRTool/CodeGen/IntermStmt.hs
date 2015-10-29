@@ -78,6 +78,8 @@ stmt s = s =>> stmtAction
       stmtAction (SHavocStmt (HavocStmt _ id)) = updateState id
       stmtAction (SBlockStmt (e,_) _) 
           = either' (\_ -> openScope) (\_ -> closeScope) e
+      stmtAction (SIfStmt' a)
+          = undefined
       stmtAction _ = _mp <$> get
 
 vdecl :: VarDecl String a -> VarDecl String (State St' Mp)
