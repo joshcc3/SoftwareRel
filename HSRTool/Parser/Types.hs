@@ -26,8 +26,8 @@ newtype Either' a = Either' { _unE :: Either a a }
     deriving(Eq, Ord, Read, Show)
 makeLenses ''Either'
 
-either' f g (Either' (Left x)) = g x
-either' f g (Either' (Right x)) = f x
+either' f g (Either' (Left x)) = f x
+either' f g (Either' (Right x)) = g x
 
 instance Applicative Either' where
     pure = return
@@ -151,21 +151,23 @@ instance Bifoldable ProcedureDeclT where
         <> foldMap g r
 
 instance Bitraversable ProcedureDeclT where
-    bitraverse f g (PD (PDecl a vId fp pp sts e))
+    bitraverse f g (PD (PDecl (l, r) vId fp pp sts e))
         = PD <$>
-          (PDecl <$>
-               bitraverse (traverse g) (traverse g) a
+          (h <$> traverse g l
            <*> f vId
            <*> traverse (bitraverse f g) fp
            <*> traverse (bitraverse f g) pp
            <*> traverse (bitraverse f g) sts
-           <*> traverse f e)
+           <*> traverse f e
+           <*> traverse g r)
+              where
+                h l a b c d e r = PDecl (l, r) a b c d e
 
 instance Traversable (ProcedureDeclT id) where
     traverse = bitraverse pure
 
 instance Comonad (ProcedureDecl' a' id) where
-    extract = extract . fst . _pdeclInfo
+    extract = either' id id . fst . _pdeclInfo
     duplicate s
         = s { _pdeclInfo = a }
           where
@@ -191,11 +193,14 @@ instance Bifoldable PrePost where
     bifoldMap f g p = fold (bimap f g p)
 
 instance Bifunctor PrePost where
-    bimap f g (PPEns a e) = PPEns (g a) (bimap id f e)
+    bimap f g (PPEns a e) = PPEns (g a) (fmap f e)
+    bimap f g (PPReq a e) = PPReq (g a) (fmap f e)
 
 instance Bitraversable PrePost where
     bitraverse f g (PPReq a e)
         = PPReq <$> g a <*> bitraverse pure f e
+    bitraverse f g (PPEns a e)
+        = PPEns <$> g a <*> bitraverse pure f e
 
 
 data Stmt id a = SVarDecl { _svdVDecl :: (VarDecl id a) } |

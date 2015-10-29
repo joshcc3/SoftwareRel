@@ -26,9 +26,15 @@ ex2 = SBlockStmt (Either' (Left ()), Either' (Right ()))
 ex3 = SBlockStmt (Either' (Left ()), Either' (Right ()))
       [SVarDecl (VarDecl () "x"), ex2, ex1]
 
-runIntermStmtGen p = do
+ex4' = PDecl (Either' (Left ()), Either' (Right ())) "a" [] [] [] (ELit 3)
+ex4'' = PDecl (Either' (Left ()), Either' (Right ())) "a" [] [] [SVarDecl (VarDecl () "y")] (ELit 3)
+ex4 = Program () [VarDecl () "x"] 
+      [ex4']
+
+
+runIntermASTGen p = do
   res <- runParserTest p
-  either (error . show) f res
-      where 
-        f = return . g . traverse (bitraverse subst id . stmt) . _pStmts . head . _pPDecls
-        g s = runState s (St' M.empty)
+  either (error . show) (return . intermAST) res
+  
+
+intermAST x = runState (genIntermProg x) initSt

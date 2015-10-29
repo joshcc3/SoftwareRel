@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase, TemplateHaskell #-}
 
-module HSRTool.CodeGen.IntermStmt(updateState, subst, stmt, St'(..)) where
+module HSRTool.CodeGen.IntermStmt(genIntermProg, genIntermPDecl, initSt) where
 
 import HSRTool.Parser.Types as T
 import HSRTool.CodeGen.Utils
@@ -89,21 +89,27 @@ fparams v = v & fpInfo .~ updateState (_fID v)
 prePost :: PrePost id a -> PrePost id (State St' Mp)
 prePost p = (_mp <$> get) <$ p
 
-genIntermProg :: ProcedureDecl String a -> State St' (ProcedureDecl NewId Mp)
-genIntermProg procDecl = undefined -- bitraverse subst id (procedureDecl procDecl)
+procedureDecl :: ProcedureDecl String a -> ProcedureDecl String (State St' Mp)
+procedureDecl p = g (p =>> pdAction)
+    where 
+      g (PDecl i id fp pp sts e) 
+          = PDecl i id (map fparams fp) (map prePost pp) (map stmt sts) e
 
-procedureDecl :: ProcedureDecl' Mp String a -> ProcedureDecl' Mp String (State St' Mp)
-procedureDecl p  
-    =  undefined {-PDecl 
-      (updateState (_pId p)) 
-      (_pId p) 
-      (map fparams (_pFParams p))
-      (map prePost (_pPrepost p)) 
-      (map stmt (_pStmts p))
-      (_pExpr p)-}
+pdAction p = do
+        let pInfo = fst (_pdeclInfo p)
+            pName = _pId p
+        either' (\_ -> updateState pName >> openScope) (\_ -> closeScope) pInfo
 
-{-program p
-      = Program
-        get
-        (map vdecl (_pVarDecls p))
-        (map -}
+program (Program _ vs ps)
+      = Program get (map vdecl vs) (map procedureDecl ps)
+
+genIntermProg :: Program a String a -> State St' (Program Mp NewId St')
+genIntermProg p
+    = case program p of
+        Program a vs ps -> Program <$> a 
+                          <*> traverse (bitraverse subst id) vs
+                          <*> traverse genIntermPDecl ps
+
+genIntermPDecl p = getPDecl <$> bitraverse subst id (PD p)
+
+initSt = St' M.empty
