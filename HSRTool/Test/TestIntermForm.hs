@@ -31,6 +31,9 @@ ex4'' = PDecl (Either' (Left ()), Either' (Right ())) "a" [] [] [SVarDecl (VarDe
 ex4 = Program () [VarDecl () "x"] 
       [ex4']
 
+ex5 = SIfStmt' a
+    where 
+      a = Centre (Either' (Left (Either' (Left (ELit 3)))))
 
 runIntermASTGen p = do
   res <- runParserTest p

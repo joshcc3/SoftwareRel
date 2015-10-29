@@ -2,6 +2,11 @@
 
 module HSRTool.Parser.Utils where
 
+import Control.Comonad
+import Data.Traversable
+import Data.Monoid
+import Control.Monad.State
+import Data.Distributive
 import Control.Monad.Trans
 import Data.List (nub)
 import Data.Functor.Identity
@@ -87,3 +92,17 @@ ident = (:) <$> chs <*> many (chs <|> digit)
 
 bar x = try ((:) <$> (x <* many space) <*> (try (string commaT *> many space *> bar x) <|> ([] <$ many space)))
         <|> ([] <$ many space)
+
+scanlC :: (Comonad f, Traversable f, Monoid a) => f a -> f a
+scanlC s = fst . flip runState mempty . traverse id $ s =>> f
+    where 
+      f x = do
+        st <- get
+        put (st<>extract x)
+        get
+
+integrate :: (Traversable f, Comonad f) => f (a -> a) -> a -> f a
+integrate = distribute . 
+            fmap (appEndo . getDual) . 
+            scanlC . 
+            fmap (Dual . Endo)
