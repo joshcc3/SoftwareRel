@@ -1,11 +1,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase, TemplateHaskell #-}
 
-module HSRTool.CodeGen.IntermStmt(genIntermProg, genIntermPDecl, initSt) where
+module HSRTool.CodeGen.IntermStmt where -- (genIntermProg, genIntermPDecl, initSt) where
 
 import HSRTool.Parser.Types as T
 import HSRTool.CodeGen.Utils
 import Control.Monad.State
+import Control.Monad.Writer
 import Data.Distributive
 import Data.Traversable
 import Data.Foldable
@@ -120,3 +121,5 @@ genIntermProg p
 genIntermPDecl p = getPDecl <$> bitraverse subst id (PD p)
 
 initSt = St' M.empty
+
+
