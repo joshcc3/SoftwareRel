@@ -1,7 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase, TemplateHaskell #-}
 
-module HSRTool.CodeGen.IntermStmt where -- (genIntermProg, genIntermPDecl, initSt) where
+module HSRTool.CodeGen.IntermStmt 
+    (genIntermProg, genIntermPDecl, initSt, NewId(..), St'(..)) where
 
 import HSRTool.Parser.Types as T
 import HSRTool.CodeGen.Utils

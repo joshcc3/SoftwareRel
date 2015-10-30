@@ -243,9 +243,9 @@ instance Bifunctor Stmt where
         = SBlockStmt (fmap g l, fmap g r) (map (bimap f g) s)
     bimap f g (SIfStmt' a) = SIfStmt' (bimap h h' a)
         where
-          h' = (fmap.fmap) g
-          h = bimap (bimap (fmap f) (fmap (bimap f g)))
-                      ((fmap.fmap) (bimap f g))
+          h' = (fmap . fmap) g
+          h =  bimap (bimap (fmap f) (bimap (fmap f) (fmap (bimap f g))))
+                      (fmap (bimap (fmap f) (fmap (bimap f g))))
 
 instance Bifoldable Stmt where
     bifoldMap f g = fold . bimap f g
@@ -266,9 +266,12 @@ instance Bitraversable Stmt where
                 h x y z = SBlockStmt (x, z) y
     bitraverse f g (SIfStmt' a) = SIfStmt' <$> bitraverse h h' a
         where
+          h =  bitraverse
+                 (bitraverse
+                    (traverse f)
+                    (bitraverse (traverse f) (traverse (bitraverse f g))))
+                 (traverse (bitraverse (traverse f) (traverse (bitraverse f g))))
           h' = (traverse.traverse) g
-          h = bitraverse (bitraverse (traverse f) (traverse (bitraverse f g)))
-                         ((traverse.traverse) (bitraverse f g))
 
 data AssignStmt id a = AssignStmt {
       _assInfo :: a,
@@ -374,8 +377,8 @@ data AltList t a = Centre a |
                    Outer a (AltList a t) a
                    deriving (Eq, Ord, Show, Read)
 
-
-type IfInfo id a = Either (Either (Expr Op id) [Stmt id a]) (Maybe [Stmt id a])
+type IfInfo id a
+    = Either (Either (Expr Op id) (Expr Op id, [Stmt id a])) (Maybe (Expr Op id, [Stmt id a]))
 
 makePrisms ''PrePost
 makeLenses ''PrePost
@@ -500,12 +503,12 @@ instance Comonad (Stmt id) where
           where
             a' = (s <$ l, s' <$ r)
             s' = s & sbAInfo %~ swap
-    duplicate (SIfStmt' a) = SIfStmt' (first f a')
+    duplicate (SIfStmt' a) = undefined {-SIfStmt' (first f a')
         where
           f  = bimap (second (fmap duplicate)) ((fmap.fmap) duplicate)
           a' = zipWithAltList (flip const) h' a (duplicate a)
           h' b d = (fmap . fmap) (const (SIfStmt' d)) b
-
+          -}
 instance Functor (AltList t) where
     fmap = bimap id
 
@@ -550,6 +553,6 @@ zipWithAltList f g (Outer a m b) (Outer c m' d)
 
 pos :: Int -> a -> Either' (Either' a)
 pos = (l !!)
-    where 
+    where
       l' = [Either' . Left, Either' . Right]
       l = (.) <$> l' <*> l'

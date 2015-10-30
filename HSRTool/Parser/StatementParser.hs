@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE LambdaCase, FlexibleContexts, FlexibleInstances   #-}
 
 module HSRTool.Parser.StatementParser where
@@ -79,9 +80,9 @@ ifStmt = do
             = (Outer (pos 0 ()) 
                (Outer (Left (Left e))
                 (Outer (pos 1 ()) 
-                 (Centre (Left (Right b))) 
-                (pos 2 ())) 
-               (Right b')) 
+                 (Centre (Left (Right (e, b))))
+                (pos 2 ()))
+               (Right ((e,) <$> b')))
               (pos 3 ()))
 blockStmt = do
   string ocurlyT
