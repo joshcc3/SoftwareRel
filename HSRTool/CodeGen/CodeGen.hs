@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module HSRTool.CodeGen.CodeGen where
+module HSRTool.CodeGen.CodeGen() where
 
 -- Attempt 2 at codegeneration, cleaner implementation
 
@@ -13,7 +13,7 @@ import Control.Applicative
 import qualified Data.Set as S
 import Control.Lens
 import HSRTool.CodeGen.Types
-import HSRTool.CodeGen.IntermStmt
+import HSRTool.CodeGen.IntermStmt(NewId(..))
 import HSRTool.Parser.Types
 import Control.Monad.State
 import Control.Monad.Writer
@@ -27,7 +27,7 @@ type M id id' = M.Map id id'
 genStat (PPReq _ e) = Left (SAssumeStmt (AssumeStmt () e))
 genStat (PPEns _ e) = Right (SAssertStmt (AssertStmt () e))
 transProg = pPDecls.traverse %~ g
-    where 
+    where
       g p = case partitionEithers (map genStat (_pPrepost p)) of
               (ls, rs) -> p & pStmts %~ (ls ++) . (++ rs)
 
@@ -48,33 +48,33 @@ stmtToSSA _ = []
 {-
 accumPred (SIfStmt' a)
     = either' (either' enterIf atThen) (either' atElse exitIf) (extract a)
-      where 
+      where
         enterIf _ = let v = extract a
                     in openScope >> id %= updatePred v >> listToMaybe <$> get
         atThen _ = get
         atElse _ = let v = extract a
                    in do
                      closeScope
-                     openScope 
+                     openScope
                      id %= updatePred (EUnOp LNot (UnOp v))
                      listToMaybe <$> get
         exitIf = (\_ -> closeScope)
         updatePred mv p' = maybe p' (:p') $ do
                              p <- listToMaybe p'
                              newPred <- mv
-                             return (EBinOp LAnd (Pair p newPred))              
+                             return (EBinOp LAnd (Pair p newPred))
 accumPred (SAssumeStmt (AssumeStmt _ e))
     = listToMaybe <$> get
 --  id %= undefined -- \x -> NEBinOp LAnd x undefined {-(NE p)-} :=> NE undefined -- p
 accumPred _ = listToMaybe <$> get
 -}
 
-accumAssump :: Stmt String a -> 
-              State [(Pred Op String, Assumption Op String)] 
+accumAssump :: Stmt String a ->
+              State [(Pred Op String, Assumption Op String)]
                     (Maybe (Pred Op String, Assumption Op String))
 accumAssump (SIfStmt' a)
   = either' (either' enterIf atThen) (either' atElse exitIf) (extract a)
-      where 
+      where
         enterIf _ = listToMaybe <$> get
         atThen _ = do
           let bExpr = (extract <$> a^?_Outer._2)^?_Just._Left._Right._1
@@ -101,14 +101,13 @@ openScope :: State [a] (Maybe a)
 openScope = do
   id %= g
   listToMaybe <$> get
-    where 
+    where
       g [] = []
       g (x:xs) = x:x:xs
 closeScope :: State [a] (Maybe a)
 closeScope = do
   id %= g
   listToMaybe <$> get
-      where 
+      where
         g [] = []
         g (x:xs) = xs
-

@@ -16,7 +16,8 @@ statementParser =
     SAssertStmt <$> try assertStmt <|>
     SAssumeStmt <$> try assumeStmt <|>
     SHavocStmt <$> try havocStmt <|>
-    SIfStmt' <$> try ifStmt <|>
+    SIfStmt <$> try ifStmt <|>
+    --SIfStmt' <$> try ifStmt' <|>
     SBlockStmt (Either' (Left ()), Either' (Right ())) <$> blockStmt
 -- varDecl :: ParsecT String u Identity (VarDecl String ASTInfo)
 
@@ -74,12 +75,29 @@ ifStmt = do
         many space
         return (Just b)
       ) <|> return Nothing
+  return (IfStmt () e b b')
+      where
+        toIfSt e b b' = IfStmt
+ifStmt' = do
+  string ifK
+  many space
+  e <- parseExpr
+  many space
+  b <- blockStmt
+  many space
+  b' <- try (do
+        string elseK
+        many space
+        b' <- blockStmt
+        many space
+        return (Just b)
+      ) <|> return Nothing
   return (toIfSt e b b')
-      where 
-        toIfSt e b b' 
-            = (Outer (pos 0 ()) 
+      where
+        toIfSt e b b'
+            = (Outer (pos 0 ())
                (Outer (Left (Left e))
-                (Outer (pos 1 ()) 
+                (Outer (pos 1 ())
                  (Centre (Left (Right (e, b))))
                 (pos 2 ()))
                (Right ((e,) <$> b')))

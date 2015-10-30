@@ -106,6 +106,7 @@ data Program a' id a = Program {
       _pPDecls :: [ProcedureDecl id a']
 } deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
 
+
 data VarDecl id a = VarDecl {
       _vInfo :: a,
       _varId :: id
@@ -129,6 +130,12 @@ data ProcedureDecl' a' id a = PDecl {
       _pStmts :: [Stmt id a'],
       _pExpr :: Expr Op id
 } deriving (Eq, Ord, Show, Read, Functor)
+
+instance Bifunctor (ProcedureDecl' a') where
+    bimap f g (PDecl i id fp pp pst pexpr)
+          = PDecl (bimap (fmap g) (fmap g) i) (f id) ((map.first) f fp)
+            ((map.first) f pp) ((map.first) f pst)
+            (fmap f pexpr)
 
 newtype ProcedureDeclT id a = PD { getPDecl :: ProcedureDecl' a id a }
     deriving (Eq, Ord, Read, Show)
@@ -503,12 +510,12 @@ instance Comonad (Stmt id) where
           where
             a' = (s <$ l, s' <$ r)
             s' = s & sbAInfo %~ swap
-    duplicate (SIfStmt' a) = undefined {-SIfStmt' (first f a')
+    duplicate (SIfStmt' a) = error "TODO: Implement duplicate for IfStmt case" {-SIfStmt' (first f a')
         where
           f  = bimap (second (fmap duplicate)) ((fmap.fmap) duplicate)
           a' = zipWithAltList (flip const) h' a (duplicate a)
           h' b d = (fmap . fmap) (const (SIfStmt' d)) b
-          -}
+-}
 instance Functor (AltList t) where
     fmap = bimap id
 
@@ -556,3 +563,7 @@ pos = (l !!)
     where
       l' = [Either' . Left, Either' . Right]
       l = (.) <$> l' <*> l'
+
+instance Bifunctor (Program a') where
+    bimap f g (Program a ps pds)
+        = Program (g a) ((map.first) f ps) ((map.first) f pds)
