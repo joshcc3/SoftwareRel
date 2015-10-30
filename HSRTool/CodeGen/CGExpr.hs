@@ -10,7 +10,7 @@ import Data.Monoid
 import Control.Applicative
 import qualified Data.Set as S
 import Control.Lens
-import HSRTool.CodeGen.Types hiding (NewId(..), count)
+import HSRTool.CodeGen.Types
 import HSRTool.Parser.Types
 import Control.Monad.State
 import Control.Monad.Writer
@@ -102,9 +102,12 @@ toSSA (SAssumeStmt (AssumeStmt _ e)) p = do
   ass %= \x -> NEBinOp LAnd x (NE p) :=> NE (apply e mp)
 
 
-lkup :: Ord id => M id id' -> id -> id'
-lkup = fmap (maybe (error "Uninitialized Variable encountered in lkup") id) . flip M.lookup
-fresh :: Ord id => id -> SSAEval id NewId
+lkup :: (Ord id, Show id) => M id id' -> id -> id'
+lkup m varId = maybe
+            (error $ "Uninitialized Variable encountered in lkup: " ++ show varId)
+            id
+            (M.lookup varId m)
+fresh :: (Ord id, Show id) => id -> SSAEval id NewId
 fresh v = do
   m.ix v.count %= (+1)
   mp <- _m <$> get
