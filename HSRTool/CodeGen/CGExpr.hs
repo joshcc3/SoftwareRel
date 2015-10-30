@@ -23,7 +23,7 @@ type M id id' = M.Map id id'
 data St id id' = St {
       _m :: M id id',
       _ass :: Assumption Op NewId
-}
+} deriving (Eq, Ord, Show, Read)
 makeLenses ''St
 
 runStack :: b -> StateT b (WriterT w m) a -> m ((a, b), w)

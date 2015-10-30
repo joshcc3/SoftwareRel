@@ -4,6 +4,7 @@ module HSRTool.Test.TestIntermForm where
 
 import HSRTool.CodeGen.IntermStmt
 import HSRTool.Parser.Types
+import HSRTool.CodeGen.CodeGen
 import Control.Monad.State
 import Data.Distributive
 import Data.Foldable
