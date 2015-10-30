@@ -70,6 +70,12 @@ applyExpr EResult scopeDict globalOldDict =
 applyExpr (EOld ident) scopeDict globalOldDict =
     EID $ NewId (getScopeIdNum ident globalOldDict) ident
 
+type ModSet = Set.Set (Ident, VarScopeInfo)
+
+getModSet :: [StmtAST] -> ModSet
+getModSet ((SVarDecl _ (VarDecl _ ident)) : stmts)  =
+
+
 -------------------------------------------------------------------------------
 
 fromProg :: Program Ident a -> StmtSSAs
@@ -91,8 +97,8 @@ fromVarDecl (VarDecl _ ident) (scopeDict, freshDict) =
         varScopeInfo = case Map.lookup ident scopeDict of
             Nothing -> VarScopeDecl
             Just (prevIdnum, VarScopeOuter) -> VarScopeReDecl prevIdnum
-            Just (_, _) -> error $ "Attempt to declared variable \""
-                           ++ ident ++ "\" twice on the same scope."
+            Just _ -> error $ "Attempt to declared variable \""
+                              ++ ident ++ "\" twice on the same scope."
         scopeDict' = Map.insert ident (curIdNum, varScopeInfo) scopeDict
 
 fromProcedureDecl :: ProcedureDecl Ident a -> ScopeDict
@@ -101,10 +107,11 @@ fromProcedureDecl (PDecl _ ident formalParams prePosts stmts retExpr)
         scopeDict (ssa, freshDict) =
     undefined -- TODO
 
-
 fromStmt :: StmtAST -> PropSSAs -> PropSSAs
-                -> ScopeDict -> FreshDict -> (StmtSSAs, FreshDicts)
-fromStmt (SVarDecl _ varDecls) preds assums scopeDict freshDict =
-
+                -> (StmtSSAs, ScopeDict, FreshDicts)
+                -> (StmtSSAs, ScopeDict, FreshDicts)
+fromStmt (SVarDecl _ varDecls) preds assums (ssa, scopeDict, freshDict) =
+    (ssa, scopeDict', freshDict')
     where
         (scopeDict', freshDict') = fromVarDecl varDecls (scopeDict, freshDict)
+fromStmt
