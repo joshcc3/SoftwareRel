@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveFunctor, TemplateHaskell #-}
 
-module HSRTool.CodeGen.SMTForm where
+module HSRTool.CodeGen.SMTForm(fromSSA) where
 
 import Data.List (nub)
 

@@ -1,7 +1,7 @@
-{-# LANGUAGE 
-  DeriveFunctor, 
-  DeriveFoldable, 
-  DeriveTraversable, 
+{-# LANGUAGE
+  DeriveFunctor,
+  DeriveFoldable,
+  DeriveTraversable,
   GeneralizedNewtypeDeriving,
   TypeSynonymInstances,
   TemplateHaskell #-}
@@ -55,7 +55,7 @@ instance Comonad Either' where
     duplicate s = s <$ s
 
 
-data ZList a = ZList { leftZ :: [a], focus :: a, rightZ :: [a] } 
+data ZList a = ZList { leftZ :: [a], focus :: a, rightZ :: [a] }
                deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
 
 
@@ -73,7 +73,7 @@ iterateWhile f a = a:maybe [] (iterateWhile f) (f a)
 instance Comonad ZList where
     extract = focus
     duplicate z = ZList l' z r'
-        where 
+        where
           l' = tail (iterateWhile shiftL z)
           r' = tail (iterateWhile shiftR z)
 
@@ -106,6 +106,7 @@ data Program a' id a = Program {
       _pPDecls :: [ProcedureDecl id a']
 } deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
 
+
 data VarDecl id a = VarDecl {
       _vInfo :: a,
       _varId :: id
@@ -130,6 +131,12 @@ data ProcedureDecl' a' id a = PDecl {
       _pExpr :: Expr Op id
 } deriving (Eq, Ord, Show, Read, Functor)
 
+instance Bifunctor (ProcedureDecl' a') where
+    bimap f g (PDecl i id fp pp pst pexpr)
+          = PDecl (bimap (fmap g) (fmap g) i) (f id) ((map.first) f fp)
+            ((map.first) f pp) ((map.first) f pst)
+            (fmap f pexpr)
+
 newtype ProcedureDeclT id a = PD { getPDecl :: ProcedureDecl' a id a }
     deriving (Eq, Ord, Read, Show)
 
@@ -137,12 +144,12 @@ instance Functor (ProcedureDeclT id) where
     fmap = bimap id
 
 instance Bifunctor ProcedureDeclT where
-    bimap f g (PD (PDecl (l,r) i fp pp sts e)) 
-        = PD (PDecl (fmap g l, fmap g r) 
-                    (f i) 
-                    (fmap (bimap f g) fp) 
+    bimap f g (PD (PDecl (l,r) i fp pp sts e))
+        = PD (PDecl (fmap g l, fmap g r)
+                    (f i)
+                    (fmap (bimap f g) fp)
                     (fmap (bimap f g) pp)
-                    (fmap (bimap f g) sts) 
+                    (fmap (bimap f g) sts)
                     (fmap f e)
              )
 
@@ -150,9 +157,9 @@ instance Foldable (ProcedureDeclT id) where
     foldMap = bifoldMap (const mempty)
 
 instance Bifoldable ProcedureDeclT where
-    bifoldMap f g (PD (PDecl (l, r) id fp pp sts e)) = 
+    bifoldMap f g (PD (PDecl (l, r) id fp pp sts e)) =
         foldMap g l
-        <> f id 
+        <> f id
         <> foldMap (bifoldMap f g) fp
         <> foldMap (bifoldMap f g) pp
         <> foldMap (bifoldMap f g) sts
@@ -161,7 +168,7 @@ instance Bifoldable ProcedureDeclT where
 
 instance Bitraversable ProcedureDeclT where
     bitraverse f g (PD (PDecl (l, r) vId fp pp sts e))
-        = PD <$> 
+        = PD <$>
           (h <$> traverse g l
            <*> f vId
            <*> traverse (bitraverse f g) fp
@@ -169,7 +176,7 @@ instance Bitraversable ProcedureDeclT where
            <*> traverse (bitraverse f g) sts
            <*> traverse f e
            <*> traverse g r)
-              where 
+              where
                 h l a b c d e r = PDecl (l, r) a b c d e
 
 instance Traversable (ProcedureDeclT id) where
@@ -177,9 +184,9 @@ instance Traversable (ProcedureDeclT id) where
 
 instance Comonad (ProcedureDecl' a' id) where
     extract = either' id id . fst . _pdeclInfo
-    duplicate s 
+    duplicate s
         = s { _pdeclInfo = a }
-          where 
+          where
             (l, r) = _pdeclInfo s
             a = (s <$ l, s' <$ r)
             s' = s { _pdeclInfo = (r, l) }
@@ -207,9 +214,9 @@ instance Bifunctor PrePost where
     bimap f g (PPReq a e) = PPReq (g a) (fmap f e)
 
 instance Bitraversable PrePost where
-    bitraverse f g (PPReq a e) 
+    bitraverse f g (PPReq a e)
         = PPReq <$> g a <*> bitraverse pure f e
-    bitraverse f g (PPEns a e) 
+    bitraverse f g (PPEns a e)
         = PPEns <$> g a <*> bitraverse pure f e
 
 
@@ -240,11 +247,11 @@ instance Bifunctor Stmt where
     bimap f g (SAssumeStmt s) = SAssumeStmt (bimap f g s)
     bimap f g (SHavocStmt h) = SHavocStmt  (bimap f g h)
     bimap f g (SIfStmt i) = SIfStmt  (bimap f g i)
-    bimap f g (SBlockStmt (l, r) s) 
+    bimap f g (SBlockStmt (l, r) s)
         = SBlockStmt (fmap g l, fmap g r) (map (bimap f g) s)
     bimap f g (SIfStmt' a) = SIfStmt' (bimap h h' a)
-        where 
-          h' = (fmap . fmap) g 
+        where
+          h' = (fmap . fmap) g
           h =  bimap (bimap (fmap f) (bimap (fmap f) (fmap (bimap f g))))
                       (fmap (bimap (fmap f) (fmap (bimap f g))))
 
@@ -259,16 +266,16 @@ instance Bitraversable Stmt where
     bitraverse f g (SHavocStmt h) = SHavocStmt <$> (bitraverse f g h)
     bitraverse f g (SIfStmt i) = SIfStmt <$> (bitraverse f g i)
     bitraverse f g (SBlockStmt (l, r) s)
-        = h <$> 
+        = h <$>
           traverse g l
           <*> traverse (bitraverse f g) s
           <*> traverse g r
-              where 
+              where
                 h x y z = SBlockStmt (x, z) y
-    bitraverse f g (SIfStmt' a) = undefined SIfStmt' <$> bitraverse h h' a
-        where 
-          h =  bitraverse 
-                 (bitraverse 
+    bitraverse f g (SIfStmt' a) = SIfStmt' <$> bitraverse h h' a
+        where
+          h =  bitraverse
+                 (bitraverse
                     (traverse f)
                     (bitraverse (traverse f) (traverse (bitraverse f g))))
                  (traverse (bitraverse (traverse f) (traverse (bitraverse f g))))
@@ -311,7 +318,7 @@ instance Bifoldable AssertStmt where
     bifoldMap f g = fold . bimap f g
 
 instance Bitraversable AssertStmt where
-    bitraverse f g (AssertStmt a e) 
+    bitraverse f g (AssertStmt a e)
         = AssertStmt <$> g a <*> traverse f e
 
 data AssumeStmt id a = AssumeStmt {
@@ -332,7 +339,7 @@ instance Bifoldable AssumeStmt where
     bifoldMap f g = fold . bimap f g
 
 instance Bitraversable AssumeStmt where
-    bitraverse f g (AssumeStmt a e) 
+    bitraverse f g (AssumeStmt a e)
         = AssumeStmt <$> g a <*> traverse f e
 
 data HavocStmt id a = HavocStmt {
@@ -352,7 +359,7 @@ instance Bifoldable HavocStmt where
     bifoldMap f g = fold . bimap f g
 
 instance Bitraversable HavocStmt where
-    bitraverse f g (HavocStmt a e) 
+    bitraverse f g (HavocStmt a e)
         = HavocStmt <$> g a <*> f e
 
 data IfStmt id a = IfStmt {
@@ -370,15 +377,15 @@ instance Bifoldable IfStmt where
     bifoldMap f g = fold . bimap f g
 
 instance Bitraversable IfStmt where
-    bitraverse f g (IfStmt a e t els) 
+    bitraverse f g (IfStmt a e t els)
         = IfStmt <$> g a <*> traverse f e <*> (traverse (bitraverse f g) t)
           <*> ((traverse.traverse) (bitraverse f g) els)
 
-data AltList t a = Centre a | 
+data AltList t a = Centre a |
                    Outer a (AltList a t) a
                    deriving (Eq, Ord, Show, Read)
 
-type IfInfo id a 
+type IfInfo id a
     = Either (Either (Expr Op id) (Expr Op id, [Stmt id a])) (Maybe (Expr Op id, [Stmt id a]))
 
 makePrisms ''PrePost
@@ -499,17 +506,17 @@ instance Comonad (Stmt id) where
     duplicate s@(SHavocStmt (HavocStmt _ v)) = SHavocStmt (HavocStmt s v)
     duplicate s@(SIfStmt ifS@(IfStmt _ e st els ))
         = SIfStmt (IfStmt s e (map duplicate st) ((fmap.map) duplicate els))
-    duplicate s@(SBlockStmt (l, r) st) 
+    duplicate s@(SBlockStmt (l, r) st)
         = SBlockStmt a' (fmap duplicate st)
-          where 
+          where
             a' = (s <$ l, s' <$ r)
             s' = s & sbAInfo %~ swap
-    duplicate (SIfStmt' a) = undefined {-SIfStmt' (first f a')
-        where 
+    duplicate (SIfStmt' a) = error "TODO: Implement duplicate for IfStmt case" {-SIfStmt' (first f a')
+        where
           f  = bimap (second (fmap duplicate)) ((fmap.fmap) duplicate)
           a' = zipWithAltList (flip const) h' a (duplicate a)
           h' b d = (fmap . fmap) (const (SIfStmt' d)) b
-          -}
+-}
 instance Functor (AltList t) where
     fmap = bimap id
 
@@ -537,7 +544,7 @@ instance Comonad (AltList t) where
 
     duplicate c@(Centre a) = Centre c
     duplicate c@(Outer a x a') = Outer c x' (rev c)
-        where 
+        where
           x' = x&_Outer._2 %~ duplicate
           rev :: AltList a b -> AltList a b
           rev (Centre x) = Centre x
@@ -548,12 +555,16 @@ zipWithAltList :: (a -> c -> e) -> (b -> d -> f) ->
 zipWithAltList _ f (Centre x) (Centre y) = Centre (f x y)
 zipWithAltList _ f (Centre x) (Outer a _ b) = Centre (f x a)
 zipWithAltList _ f (Outer a _ _) (Centre x) = Centre (f a x)
-zipWithAltList f g (Outer a m b) (Outer c m' d) 
+zipWithAltList f g (Outer a m b) (Outer c m' d)
     = Outer (g a c) (zipWithAltList g f m m') (g b d)
 
 
 pos :: Int -> a -> Either' (Either' a)
 pos = (l !!)
-    where 
+    where
       l' = [Either' . Left, Either' . Right]
       l = (.) <$> l' <*> l'
+
+instance Bifunctor (Program a') where
+    bimap f g (Program a ps pds)
+        = Program (g a) ((map.first) f ps) ((map.first) f pds)

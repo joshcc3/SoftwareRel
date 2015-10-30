@@ -37,7 +37,7 @@ runSSAGenerator :: Program a String a -> IO (SSA Op NewId)
 runSSAGenerator (Program _ vD pD) = do
   o <- runStack initSt pDecls
   return (snd o)
-    where 
+    where
       initSt = St M.empty (NE (ELit 1))
       g x = do
         m %= initialize (_varId x)
@@ -50,7 +50,7 @@ type SSAEval id = StateT (St id NewId) (WriterT (SSA Op NewId) IO)
 genStat (PPReq _ e) = Left (SAssumeStmt (AssumeStmt () e))
 genStat (PPEns _ e) = Right (SAssertStmt (AssertStmt () e))
 transProg = pPDecls.traverse %~ g
-    where 
+    where
       g p = case partitionEithers (map genStat (_pPrepost p)) of
               (ls, rs) -> p & pStmts %~ (ls ++) . (++ rs)
 
