@@ -13,7 +13,7 @@ import Control.Applicative
 import qualified Data.Set as S
 import Control.Lens
 import HSRTool.CodeGen.Types
-import HSRTool.CodeGen.IntermStmt(NewId(..))
+import HSRTool.CodeGen.IntermStmt
 import HSRTool.Parser.Types
 import Control.Monad.State
 import Control.Monad.Writer

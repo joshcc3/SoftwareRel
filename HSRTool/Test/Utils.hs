@@ -31,8 +31,9 @@ incorrectPrefix = "tests/incorrect"
 (</>) a b = concat [a, "/", b]
 runParserTest p = readFile p >>= return . parse
 
-type Env = Either String (SSAEval String ())
+--type Env = Either String (SSAEval String ())
 
+{-
 runSSAGenTest :: String -> IO (SSA Op NewId)
 runSSAGenTest p = do
     res <- runParserTest p
@@ -41,4 +42,4 @@ runSSAGenTest p = do
 runSMTGenTest :: String -> IO ([String])
 runSMTGenTest p =
     fromSSA <$> runSSAGenTest p
-
+-}

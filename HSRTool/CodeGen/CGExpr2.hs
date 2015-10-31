@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module HSRTool.CodeGen.CGExpr2 where
+module HSRTool.CodeGen.CGExpr2(runSSAGenerator) where
 
 import Control.Monad.Cont
 import Control.Comonad
@@ -31,10 +31,17 @@ runStack s = runWriterT . flip runStateT s
 
 runSSAGenerator :: Program 
                     (M String IntermId)
+                    String 
+                    (M String IntermId)
+                   -> IO (SSA Op NewId)
+runSSAGenerator = undefined
+
+runSSAGenerator' :: Program 
+                    (M String IntermId)
                     IntermId 
                     (M String IntermId)
                    -> IO (SSA Op IntermId)
-runSSAGenerator (Program _ vD pD) = do
+runSSAGenerator' (Program _ vD pD) = do
   o <- runStack initSt pDecls
   return (snd o)
     where

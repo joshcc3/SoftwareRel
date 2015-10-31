@@ -8,7 +8,7 @@ import qualified Data.Set as Set
 import HSRTool.Parser.Types
 
 import HSRTool.CodeGen.Types
-import HSRTool.CodeGen.CGExpr
+import HSRTool.CodeGen.CGExpr2
 
 type IdSMT = String
 type BvSMT = String

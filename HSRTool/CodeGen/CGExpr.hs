@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module HSRTool.CodeGen.CGExpr where
-
+module HSRTool.CodeGen.CGExpr() where
+{-
 import Control.Monad.Cont
 import Control.Comonad
 import Data.Either (partitionEithers)
@@ -125,3 +125,4 @@ modset (SIfStmt (IfStmt _ b th Nothing)) = foldMap modset th
 modset (SIfStmt (IfStmt _ b th (Just el))) = foldMap modset th `S.union` foldMap modset el
 modset (SBlockStmt _ stmts) = foldMap modset stmts
 initialize id m = M.insert id (NewId 0 id) m
+-}

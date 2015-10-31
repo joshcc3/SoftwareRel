@@ -11,14 +11,15 @@ import HSRTool.Parser.Types
 import Data.Functor.Identity
 
 statementParser =
-    SVarDecl <$> try varDecl <|>
-    SAssignStmt <$> try assignStmt <|>
-    SAssertStmt <$> try assertStmt <|>
-    SAssumeStmt <$> try assumeStmt <|>
-    SHavocStmt <$> try havocStmt <|>
-    SIfStmt <$> try ifStmt <|>
+    S . SVarDecl <$> try varDecl <|>
+    S . SAssignStmt <$> try assignStmt <|>
+    S . SAssertStmt <$> try assertStmt <|>
+    S . SAssumeStmt <$> try assumeStmt <|>
+    S . SHavocStmt <$> try havocStmt <|>
+    S <$> try ifStmt'' <|>
+    --SIfStmt <$> try ifStmt <|>
     --SIfStmt' <$> try ifStmt' <|>
-    SBlockStmt (Either' (Left ()), Either' (Right ())) <$> blockStmt
+    S . SBlockStmt (Either' (Left ()), Either' (Right ())) <$> blockStmt
 -- varDecl :: ParsecT String u Identity (VarDecl String ASTInfo)
 
 varDecl = VarDecl () <$>
@@ -102,6 +103,24 @@ ifStmt' = do
                 (pos 2 ()))
                (Right ((e,) <$> b')))
               (pos 3 ()))
+ifStmt'' = do
+  string ifK
+  many space
+  e <- parseExpr
+  many space
+  b <- blockStmt
+  many space
+  b' <- try (do
+        string elseK
+        many space
+        b' <- blockStmt
+        many space
+        return (Just b)
+      ) <|> return Nothing
+  return (toIfSt e b b')
+      where
+        toIfSt e b b' 
+            = SIfStmt'' (pos 0 ((), (), (), ())) e b b'
 blockStmt = do
   string ocurlyT
   many space

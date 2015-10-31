@@ -4,7 +4,7 @@ module HSRTool.Test.TestIntermForm where
 
 import HSRTool.CodeGen.IntermStmt
 import HSRTool.Parser.Types
-import HSRTool.CodeGen.CodeGen
+
 import Control.Monad.State
 import Data.Distributive
 import Data.Foldable
@@ -35,10 +35,11 @@ ex4 = Program () [VarDecl () "x"]
 ex5 = SIfStmt' a
     where 
       a = Centre (Either' (Left (Either' (Left (ELit 3)))))
-
+{-
 runIntermASTGen p = do
   res <- runParserTest p
   either (error . show) (return . intermAST) res
   
 
 intermAST x = runState (genIntermProg x) initSt
+-}
