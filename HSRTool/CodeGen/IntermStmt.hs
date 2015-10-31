@@ -1,8 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase, TemplateHaskell #-}
 
-module HSRTool.CodeGen.IntermStmt where
-    -- (genIntermProg, genIntermPDecl, initSt, NewId(..), St'(..)) where
+module HSRTool.CodeGen.IntermStmt
+    (genIntermProg, initSt, IntermId(..), St'(..)) where
 
 import HSRTool.Parser.Types as T
 import HSRTool.CodeGen.Utils
@@ -19,15 +19,15 @@ import qualified Data.Map as M
 import Data.Bitraversable
 
 
-data NewId = NewId {
+data IntermId = IntermId {
       _varId :: String,
       _count :: Int } deriving(Eq, Ord, Read)
-instance Show NewId where
-    show (NewId v c) = v ++ show c
-makeLenses ''NewId
+instance Show IntermId where
+    show (IntermId v c) = v ++ show c
+makeLenses ''IntermId
 
 type NextCount = Int
-type Mp = M.Map String ([NewId], NextCount)
+type Mp = M.Map String ([IntermId], NextCount)
 data St' = St' {
       _mp :: Mp
     } deriving (Eq, Ord, Show, Read)
@@ -39,7 +39,7 @@ updateState id = do
   _mp <$> get
       where
         upd id = Just . maybe (freshId id) updateId
-        freshId id = ([NewId id 1], 2)
+        freshId id = ([IntermId id 1], 2)
         updateId id =  id & _1.ix 0.count .~ view _2 id & _2 %~ (+1)
 
 openScope :: (Functor m, MonadState St' m) => m Mp
@@ -58,12 +58,12 @@ closeScope = do
       g ([], _) = Nothing
       g (_:[], _) = Nothing
       g x = Just (x & _1 %~ tail)
-subst :: String -> State St' NewId
+subst :: String -> State St' IntermId
 subst s = do
   st <- get
   return (lkup (_mp st) s)
 
-lkup :: Mp -> String -> NewId
+lkup :: Mp -> String -> IntermId
 lkup mp var | null val = error "No variable defined in scope"
             | otherwise = head val
     where
@@ -75,19 +75,19 @@ lkup mp var | null val = error "No variable defined in scope"
 stmt :: Stmt String a -> Stmt String (State St' Mp)
 stmt s = s =>> stmtAction
     where
-      stmtAction (SVarDecl (VarDecl _ id)) = updateState id
-      stmtAction (SAssignStmt (AssignStmt _ id _)) = updateState id
-      stmtAction (SHavocStmt (HavocStmt _ id)) = updateState id
-      stmtAction (SBlockStmt (e,_) _)
+      stmtAction (S (SVarDecl (VarDecl _ id))) = updateState id
+      stmtAction (S (SAssignStmt (AssignStmt _ id _))) = updateState id
+      stmtAction (S (SHavocStmt (HavocStmt _ id))) = updateState id
+      stmtAction (S (SBlockStmt (e,_) _))
           = either' (\_ -> openScope) (\_ -> closeScope) e
-      stmtAction (SIfStmt'' a _)
-          = either' (either' enterIf atThen) (either' atElse exitIf) (extract a)
+      stmtAction (S (SIfStmt'' a _ _ _))
+          = either' (either' enterIf atThen) (either' atElse exitIf) a
             where 
-              enterIf _ = _mp <$> get
-              atThen _ = openScope
-              atElse _ = closeScope >> openScope
-              exitIf _ = closeScope
-      stmtAction (SIfStmt' a)
+              enterIf _ = openScope
+              atThen _ = closeScope >> openScope
+              atElse _ = closeScope
+              exitIf _ = _mp <$> get
+      stmtAction (S (SIfStmt' a))
           = either' (either' enterIf atThen) (either' atElse exitIf) (extract a)
             where
               enterIf = (\_ -> _mp <$> get)
@@ -119,7 +119,7 @@ pdAction p = do
 program (Program _ vs ps)
       = Program get (map vdecl vs) (map procedureDecl ps)
 
-genIntermProg :: Program a String a -> State St' (Program Mp NewId St')
+genIntermProg :: Program a String a -> State St' (Program Mp IntermId St')
 genIntermProg p
     = case program p of
         Program a vs ps -> Program <$> a

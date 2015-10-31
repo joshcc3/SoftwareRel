@@ -219,11 +219,12 @@ instance Bitraversable PrePost where
     bitraverse f g (PPEns a e)
         = PPEns <$> g a <*> bitraverse pure f e
 
-data Stmt id a = S { _unSt :: Stmt' Stmt a id a }
+newtype Stmt'' a' id a = S' { _unSt' :: Stmt' (Stmt'' a') a' id a }
+    deriving (Eq, Ord, Show, Read)
+newtype Stmt id a = S { _unSt :: Stmt' Stmt a id a }
    deriving(Eq, Ord, Show, Read)
 
-data Stmt' n a' id a = SPure a |
-            SVarDecl { _svdVDecl :: (VarDecl id a') } |
+data Stmt' n a' id a = SVarDecl { _svdVDecl :: (VarDecl id a') } |
             SAssignStmt { _sasAStmt :: (AssignStmt id a') } |
             SAssertStmt { _sassAStmt :: (AssertStmt id a') } |
             SAssumeStmt { _sassumeStmt :: (AssumeStmt id a') } |
@@ -266,7 +267,14 @@ instance Bifunctor Stmt where
     bimap f g (S (SIfStmt'' a e th el)) 
         = S $ SIfStmt'' ((fmap.fmap) (\x -> x&each %~ g) a) (fmap f e) (fmap (bimap f g) th)
           ((fmap.fmap) (bimap f g) el)
-
+{-
+naturality
+t . traverse f = traverse (t . f) for every applicative transformation t
+identity
+traverse Identity = Identity
+composition
+traverse (Compose . fmap g . f) = Compose . fmap (traverse g) . traverse f
+-}
 instance Bifoldable Stmt where
     bifoldMap f g (S (SVarDecl d)) = bifoldMap f g d
     bifoldMap f g (S (SAssignStmt a)) = bifoldMap f g a
@@ -277,8 +285,11 @@ instance Bifoldable Stmt where
     bifoldMap f g (S (SBlockStmt (l, r) s)) 
         = foldMap g l <> foldMap (bifoldMap f g) s <> foldMap g r
     bifoldMap f g (S (SIfStmt'' a e th el))
-        = g a1 <> foldMap f e <> g a2 <> foldMap (bifoldMap f g) th <>
-          g a3 <> (foldMap.foldMap) (bifoldMap f g) el <> g a4
+        = g a1 <> 
+          foldMap f e <> 
+          foldMap (bifoldMap f g) th <> g a2 <> 
+          (foldMap.foldMap) (bifoldMap f g) el <> g a3 <> 
+          g a4
         where 
           (a1, a2, a3, a4) = either' 
                              (either' id (\(b,a,c,d) -> (a,b,c,d)))
@@ -313,13 +324,14 @@ instance Bitraversable Stmt where
         where
           h x y z = S (SBlockStmt (x, z) y)
     bitraverse f g (S (SIfStmt'' aInfo e th el))
-        = h <$> g enter <*> traverse f e
-          <*> g atThen <*> traverse (bitraverse f g) th
-          <*> g atElse <*> (traverse.traverse) (bitraverse f g) el
-          <*> g exitIf
+        = h <$> g enterIf <*>
+          traverse f e <*>
+          traverse (bitraverse f g) th <*> g afterThen <*>
+          (traverse.traverse) (bitraverse f g) el <*> g afterElse <*>
+          g exitIf
         where 
-          h a b c d e f g = S (SIfStmt'' ((fmap.fmap) (const (a,c,e,g)) aInfo) b d f)
-          (enter, atThen, atElse, exitIf)
+          h a b c d e f g = S (SIfStmt'' ((fmap.fmap) (const (a,d,f,g)) aInfo) b c e)
+          (enterIf, afterThen, afterElse, exitIf)
               = either' (either' id (\(b,a,c,d) -> (a,b,c,d)))
                 (either' (\(c,a,b,d) -> (a,b,c,d))
                          (\(d,a,b,c) -> (a,b,c,d))) aInfo
@@ -544,15 +556,13 @@ data OpInfo = OpInfo {
       opType :: Either () ()
 } deriving (Eq, Ord, Show, Read)
 
-instance Monad (n id) => Monad (Stmt' n a' id) where
-    return = SPure
-    SPure x >>= f = f x
-    SVarDecl v >>= _ = SVarDecl v
-    SAssignStmt v >>= _ = SAssignStmt v
-    SAssertStmt b >>= _ = SAssertStmt b
-    SAssumeStmt a >>= _ = SAssumeStmt a
-    SHavocStmt a >>= _ = SHavocStmt a
---    S (l, r) 
+{-
+Pure x >>= f = f x
+
+return a >>= f ~ f a
+m >>= return ~ m
+(m >>= f) >>= g ~ m >>= (f >>= g)
+-}
     
 instance Comonad (Stmt id) where
     extract (S x) = extract' x
@@ -566,45 +576,43 @@ instance Comonad (Stmt id) where
           extract' (SBlockStmt e _) = either' id id . fst $ e
           extract' (SIfStmt' a) = extract . extract . extract $ a
           extract' (SIfStmt'' a _ _ _) = (extract.extract) a^._1
-{-
-    duplicate (S x) = S (fmap S (duplicate' x))
-        where 
-          duplicate' s@(SVarDecl (VarDecl _ id)) = SVarDecl (VarDecl s id)
-          duplicate' s@(SAssignStmt (AssignStmt _ e v)) = SAssignStmt (AssignStmt s e v)
-          duplicate' s@(SAssertStmt (AssertStmt _ v)) = SAssertStmt (AssertStmt s v)
-          duplicate' s@(SAssumeStmt (AssumeStmt _ v)) = SAssumeStmt (AssumeStmt s v)
-          duplicate' s@(SHavocStmt (HavocStmt _ v)) = SHavocStmt (HavocStmt s v)
-          duplicate' s@(SIfStmt ifS@(IfStmt _ e st els ))
-              = SIfStmt (IfStmt s e (map duplicate st) ((fmap.map) duplicate els))
-          duplicate' s@(SBlockStmt (l, r) st)
-              = SBlockStmt a' (fmap duplicate st)
-              where
-                a' = (s <$ l, s' <$ r)
-                s' = s & sbAInfo %~ swap
-          duplicate' s@(SIfStmt'' a e th el)
-              = SIfStmt'' 
-                ((fmap.fmap) (const (s, s', s'', s''')) a)
-                e 
-                (map duplicate th) 
-                ((fmap.map) duplicate el)
-              where
-                (a1, a2, a3, a4) = either' 
-                                   (either' id (\(b,a,c,d) -> (a,b,c,d)))
-                                   (either' (\(c,a,b,d) -> (a,b,c,d))
-                                             (\(d,a,b,c) -> (a,b,c,d))) a
-                s' = s&ifInfo'' .~ (fmap.fmap) (const a') a
-                s'' = s&ifInfo'' .~ (fmap.fmap) (const a'') a
-                s''' = s&ifInfo'' .~ (fmap.fmap) (const a''') a
-                a' = (a2, a1, a3, a4)
-                a'' = (a3, a1, a2, a4)
-                a''' = (a4, a1, a2, a3)
-          duplicate (SIfStmt' a) = error "TODO: Implement duplicate for IfStmt case" {-SIfStmt' (first f a')
+
+    duplicate s@(S(SVarDecl (VarDecl _ id))) = S (SVarDecl (VarDecl s id))
+    duplicate s@(S(SAssignStmt (AssignStmt _ e v))) = S(SAssignStmt (AssignStmt s e v))
+    duplicate s@(S(SAssertStmt (AssertStmt _ v))) = S(SAssertStmt (AssertStmt s v))
+    duplicate s@(S(SAssumeStmt (AssumeStmt _ v))) = S(SAssumeStmt (AssumeStmt s v))
+    duplicate s@(S(SHavocStmt (HavocStmt _ v))) = S(SHavocStmt (HavocStmt s v))
+    duplicate s@(S(SIfStmt ifS@(IfStmt _ e st els )))
+        = S(SIfStmt (IfStmt s e (map duplicate st) ((fmap.map) duplicate els)))
+    duplicate s@(S(SBlockStmt (l, r) st))
+        = S(SBlockStmt a' (fmap duplicate st))
+        where
+          a' = (s <$ l, s' <$ r)
+          s' = S (SBlockStmt (r, l) st)
+    duplicate s@(S(SIfStmt'' a e th el))
+        = S(SIfStmt''
+            ((fmap.fmap) (const (s, s', s'', s''')) a)
+            e 
+            (map duplicate th)
+            ((fmap.map) duplicate el))
+        where
+          (a1, a2, a3, a4) = either' 
+                             (either' id (\(b,a,c,d) -> (a,b,c,d)))
+                             (either' (\(c,a,b,d) -> (a,b,c,d))
+                                       (\(d,a,b,c) -> (a,b,c,d))) a
+          s' = S (SIfStmt'' ((fmap.fmap) (const a') a) e th el)
+          s'' = S (SIfStmt'' ((fmap.fmap) (const a'') a) e th el)
+          s''' = S (SIfStmt'' ((fmap.fmap) (const a''') a) e th el)
+          a' = (a2, a1, a3, a4)
+          a'' = (a3, a1, a2, a4)
+          a''' = (a4, a1, a2, a3)
+    duplicate (S(SIfStmt' a)) = error "TODO: Implement duplicate for IfStmt case" {-SIfStmt' (first f a')
         where
           f  = bimap (second (fmap duplicate)) ((fmap.fmap) duplicate)
           a' = zipWithAltList (flip const) h' a (duplicate a)
           h' b d = (fmap . fmap) (const (SIfStmt' d)) b
 -}
--}
+
 instance Functor (AltList t) where
     fmap = bimap id
 
