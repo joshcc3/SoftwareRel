@@ -1,8 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module HSRTool.CodeGen.CodeGen() where
-
--- Attempt 2 at codegeneration, cleaner implementation
+module HSRTool.CodeGen.CodeGen(runSSAGenerator) where
 
 import Control.Monad.Cont
 import Control.Comonad
@@ -13,8 +11,8 @@ import Control.Applicative
 import qualified Data.Set as S
 import Control.Lens
 import HSRTool.CodeGen.Types
+import HSRTool.Parser.Types hiding (_varId)
 import HSRTool.CodeGen.IntermStmt
-import HSRTool.Parser.Types
 import Control.Monad.State
 import Control.Monad.Writer
 import qualified Data.Map as M
@@ -23,91 +21,66 @@ type Assumption = NewExpr
 type Pred = Expr
 type M id id' = M.Map id id'
 
+data St id = St {
+      _ass :: Assumption Op id
+} deriving (Eq, Ord, Show, Read)
+makeLenses ''St
 
-genStat (PPReq _ e) = Left (SAssumeStmt (AssumeStmt () e))
-genStat (PPEns _ e) = Right (SAssertStmt (AssertStmt () e))
+runStack :: b -> StateT b (WriterT w m) a -> m ((a, b), w)
+runStack s = runWriterT . flip runStateT s
+
+
+runSSAGenerator :: Program IntermId (M String IntermId) -> IO (SSA Op IntermId)
+runSSAGenerator (P (Program _ vD pD)) = do
+  o <- runStack initSt pDecls
+  return (snd o)
+    where
+      initSt = St (NE (ELit 1))
+      pDecls = mapM_ (\x -> toSSA x (ELit 1)) $ pD >>= _pStmts
+
+type SSAEval id = StateT (St id) (WriterT (SSA Op id) IO)
+
+genStat (PPReq _ e) = Left (S (SAssumeStmt (AssumeStmt () e)))
+genStat (PPEns _ e) = Right (S (SAssertStmt (AssertStmt () e)))
 transProg = pPDecls.traverse %~ g
     where
       g p = case partitionEithers (map genStat (_pPrepost p)) of
               (ls, rs) -> p & pStmts %~ (ls ++) . (++ rs)
 
-stmtToSSA :: Stmt NewId (Pred Op NewId, Assumption Op NewId) -> SSA Op NewId
-stmtToSSA (SAssignStmt (AssignStmt _ v e)) = [SSAAssign v (NE e)]
-stmtToSSA (SBlockStmt _ l) = l >>= stmtToSSA
-stmtToSSA (SIfStmt (IfStmt _ e tn el)) =
+toSSA :: Stmt IntermId (M String IntermId) -> Pred Op IntermId -> SSAEval IntermId ()
+toSSA (S (SAssignStmt (AssignStmt _ v e))) p = tell [SSAAssign v (NE e)]
+toSSA (S (SAssertStmt (AssertStmt _ e))) p = do
+  assmpts <- _ass <$> get
+  tell [SSAAssert ((NEBinOp LAnd (NE p) assmpts) :=> NE e)]
+toSSA (S (SBlockStmt _ l)) p = mapM_ (\x -> toSSA x p) l
+toSSA (S (SIfStmt'' aInfo e tn (Just el))) p = do
   let
-      tnInstr = tn >>= stmtToSSA
-      elInstr = maybe [] id el >>= stmtToSSA
-  in tnInstr ++ elInstr
-stmtToSSA s@(SAssertStmt (AssertStmt _ e))
-    = let (p, a) = extract s
-      in [SSAAssert ((NEBinOp LAnd (NE p) a) :=> NE e)]
-stmtToSSA _ = []
+      (_, thenMap, elseMap, exitMap) = (extract . extract) aInfo
+      thenModset = foldMap (S.map _varId . modset) tn
+      elseModset = foldMap (S.map _varId . modset) el
+      thenCond = EBinOp LAnd (Pair p e)
+      elseCond = EBinOp LAnd (Pair p (EUnOp LNot (UnOp e)))
+      g v = tell [SSAAssign (lkup exitMap v)
+                  (NE $ EShortIf e
+                          (EID $ lkup thenMap v) 
+                          (EID $ lkup elseMap v))]
+  mapM_ (\x -> toSSA x thenCond) tn
+  mapM_ (\x -> toSSA x elseCond) el
+  mapM_ g (S.elems (S.union thenModset elseModset))
+toSSA (S (SAssumeStmt (AssumeStmt _ e))) p 
+    = ass %= \x -> NEBinOp LAnd x (NE p) :=> NE e
+toSSA _ _ = return ()
 
--- (extract <$> a^?_Outer._2)^?_Just._Left._Left
-{-
-accumPred (SIfStmt' a)
-    = either' (either' enterIf atThen) (either' atElse exitIf) (extract a)
-      where
-        enterIf _ = let v = extract a
-                    in openScope >> id %= updatePred v >> listToMaybe <$> get
-        atThen _ = get
-        atElse _ = let v = extract a
-                   in do
-                     closeScope
-                     openScope
-                     id %= updatePred (EUnOp LNot (UnOp v))
-                     listToMaybe <$> get
-        exitIf = (\_ -> closeScope)
-        updatePred mv p' = maybe p' (:p') $ do
-                             p <- listToMaybe p'
-                             newPred <- mv
-                             return (EBinOp LAnd (Pair p newPred))
-accumPred (SAssumeStmt (AssumeStmt _ e))
-    = listToMaybe <$> get
---  id %= undefined -- \x -> NEBinOp LAnd x undefined {-(NE p)-} :=> NE undefined -- p
-accumPred _ = listToMaybe <$> get
--}
+modset :: Ord id => Stmt id a -> S.Set id 
+modset (S(SVarDecl (VarDecl _ _))) = S.empty 
+modset (S(SAssignStmt (AssignStmt _ id e))) = S.fromList [id]
+modset (S(SAssertStmt (AssertStmt _ e))) = S.empty
+modset (S(SAssumeStmt (AssumeStmt _ e))) = S.empty
+modset (S(SHavocStmt (HavocStmt _ id))) = S.fromList [id]
+modset (S(SIfStmt (IfStmt _ b th Nothing))) = foldMap modset th
+modset (S(SIfStmt (IfStmt _ b th (Just el)))) = foldMap modset th `S.union` foldMap modset el
+modset (S(SBlockStmt _ stmts)) = foldMap modset stmts
 
-accumAssump :: Stmt String a ->
-              State [(Pred Op String, Assumption Op String)]
-                    (Maybe (Pred Op String, Assumption Op String))
-accumAssump (SIfStmt' a)
-  = either' (either' enterIf atThen) (either' atElse exitIf) (extract a)
-      where
-        enterIf _ = listToMaybe <$> get
-        atThen _ = do
-          let bExpr = (extract <$> a^?_Outer._2)^?_Just._Left._Right._1
-              ifBExpr = maybe (error "Couldn't find bool expr in if") id bExpr
-          openScope
-          ix 0._1 %= \p ->  EBinOp LAnd (Pair ifBExpr p)
-          listToMaybe <$> get
-        atElse _ = do
-          closeScope
-          let bExpr' = (extract <$> a^?_Outer._2)^?_Just._Right._Just._1
-              bExpr = maybe (error "Couldn't find bool expr in else") id bExpr'
-              elseBExpr = EUnOp LNot (UnOp bExpr)
-          openScope
-          ix 0._1 %= \p -> EBinOp LAnd (Pair p elseBExpr)
-          listToMaybe <$> get
-        exitIf _ = closeScope
-accumAssump (SAssumeStmt (AssumeStmt _ e))
-    = do
-  ix 0 %= \(p, a) -> (p, NEBinOp LAnd a (NE p) :=> NE e)
-  listToMaybe <$> get
-accumAssump _ = listToMaybe <$> get
-
-openScope :: State [a] (Maybe a)
-openScope = do
-  id %= g
-  listToMaybe <$> get
-    where
-      g [] = []
-      g (x:xs) = x:x:xs
-closeScope :: State [a] (Maybe a)
-closeScope = do
-  id %= g
-  listToMaybe <$> get
-      where
-        g [] = []
-        g (x:xs) = xs
+lkup m v = case M.lookup v m of
+             Just x -> x
+             Nothing -> error ("Undefined variable in lookup: " ++ v)

@@ -3,7 +3,7 @@ module HSRTool.Test.TestE2E where
 import Control.Lens
 import qualified Data.Map as M
 import HSRTool.Test.Utils
---import HSRTool.CodeGen.CGExpr
+import HSRTool.CodeGen.CodeGen
 import HSRTool.Parser.Parser
 import HSRTool.CodeGen.IntermStmt as IS
 import HSRTool.Parser.Types
@@ -14,25 +14,30 @@ import HSRTool.CodeGen.SMTForm
 import Data.Bifunctor
 import Control.Monad.Error
 
-
-intermToSSA :: Program a String a -> IO (SSA Op CG.NewId)
-intermToSSA = runSSAGenerator
-
---intermediateForm :: Program () String () -> State St' (Program Mp IntermSt St')
---intermediateForm = genIntermProg
-{-
+pipeline :: FilePath -> IO ()
 pipeline inp =
   case (parse inp) of
     Left x -> error $ "Could not parse file: " ++ show x
     Right ast -> do
-        let (intermState,_) = runState (intermediateForm ast) (St' M.empty)
-        mapM_ (\x -> print x >> putStrLn "") (intermState^.pPDecls.traverse.pStmts)
-        getLine
-        ssa <- intermToSSA (bimap show _mp intermState)
-        print ssa
-        getLine
-        let serializedSSA = fromSSA ssa
-        mapM_ putStrLn serializedSSA
--}
+      case runState (genIntermProg ast) (St' M.empty) of
+          (intermProg, _) -> do
+           --mapM_ (\x -> print x >> putStrLn "") (intermProg^.unP.pPDecls.traverse.pStmts)
+           ssa <-  runSSAGenerator (trans1 intermProg)
+           --getLine
+           let serializedSSA = fromSSA (trans2 ssa)
+           mapM_ putStrLn serializedSSA
 
-inputFile = readFile (correctPrefix </> divZeroP)
+--massage :: Program IntermId Mp -> Program IntermId (M String IntermId)
+trans1 = (fmap.fmap) (head.fst)
+
+trans2 :: SSA Op IntermId -> SSA Op NewId
+trans2 = fmap (bimap f g)
+    where
+      g = fmap f
+      f i = NewId c vId
+          where 
+            c = IS._count i
+            vId = IS._varId i ++ show c
+
+correctInputFile x = readFile (correctPrefix </> x)
+incorrectInputFile x = readFile (incorrectPrefix </> x)

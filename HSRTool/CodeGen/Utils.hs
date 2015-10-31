@@ -2,16 +2,14 @@
 module HSRTool.CodeGen.Utils where
 
 import Control.Monad.State
-import HSRTool.CodeGen.Types
-import qualified Data.Map as M
-import Control.Monad.State
-import Data.Distributive
-import Data.Traversable
 import Data.Foldable
-import Control.Comonad
 import Data.Monoid
-import Control.Applicative
-import Control.Lens
-import qualified Data.Map as M
-import Data.Bitraversable
+import qualified Data.Set as S
+import HSRTool.Parser.Types
+import Control.Comonad
 
+modset p = fold (p =>> f)
+    where 
+      f (S(SAssignStmt (AssignStmt _ id e))) = S.fromList [id]
+      f (S(SHavocStmt (HavocStmt _ id))) = S.fromList [id]
+      f _ = mempty

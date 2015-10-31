@@ -13,9 +13,9 @@ import Text.Parsec
 
 --programParser :: ParsecT String u Identity (Program String)
 programParser =
-    Program () <$>
+    fmap P (Program () <$>
             many (try (many space *> varDecl <* many space)) <*>
-            many (many space *> pDecl <* many space)
+            many (many space *> pDecl <* many space))
 
 declIdent = string intK *> many space *>
             ident

@@ -22,4 +22,4 @@ stripComments = try((++) <$> (try singleLineComment <|> multiLineComment) <*>
                 <|> (:) <$> anyChar <*> stripComments <|> ([] <$ eof)
 
 parse s = rp stripComments s >>=
-          rp (programParser <|> return (Program () [] []))
+          rp (programParser <|> return (P (Program () [] [])))

@@ -6,15 +6,16 @@ module HSRTool.CodeGen.IntermStmt
 
 import HSRTool.Parser.Types as T
 import HSRTool.CodeGen.Utils
-import Control.Monad.State
-import Control.Monad.Writer
+import Control.Monad.State hiding (mapM_)
+import Control.Monad.Writer hiding (mapM_)
 import Data.Distributive
 import Data.Traversable
-import Data.Foldable
+import Data.Foldable hiding (mapM_)
 import Control.Comonad
 import Data.Monoid
 import Control.Applicative
 import Control.Lens
+import qualified Data.Set as S
 import qualified Data.Map as M
 import Data.Bitraversable
 
@@ -80,13 +81,15 @@ stmt s = s =>> stmtAction
       stmtAction (S (SHavocStmt (HavocStmt _ id))) = updateState id
       stmtAction (S (SBlockStmt (e,_) _))
           = either' (\_ -> openScope) (\_ -> closeScope) e
-      stmtAction (S (SIfStmt'' a _ _ _))
-          = either' (either' enterIf atThen) (either' atElse exitIf) a
+      stmtAction (S (SIfStmt'' a _ th el))
+          = either' (either' enterIf afterThen) (either' afterElse exitIf) a
             where 
               enterIf _ = openScope
-              atThen _ = closeScope >> openScope
-              atElse _ = closeScope
-              exitIf _ = _mp <$> get
+              afterThen _ = closeScope >> openScope
+              afterElse _ = closeScope
+              exitIf _ = mapM_ updateState (S.elems mset) >> _mp <$> get
+                  where 
+                    mset = S.union (foldMap modset th) ((foldMap.foldMap) modset el)
       stmtAction (S (SIfStmt' a))
           = either' (either' enterIf atThen) (either' atElse exitIf) (extract a)
             where
@@ -116,16 +119,19 @@ pdAction p = do
             pName = _pId p
         either' (\_ -> updateState pName >> openScope) (\_ -> closeScope) pInfo
 
-program (Program _ vs ps)
-      = Program get (map vdecl vs) (map procedureDecl ps)
+program :: Program String a -> Program String (State St' Mp)
+program (P (Program _ vs ps))
+      = P (Program (_mp <$> get) (map vdecl vs) (map procedureDecl ps))
 
-genIntermProg :: Program a String a -> State St' (Program Mp IntermId St')
+genIntermProg :: Program String a -> State St' (Program IntermId Mp)
 genIntermProg p
     = case program p of
-        Program a vs ps -> Program <$> a
+        P (Program a vs ps) -> P <$> (Program <$> a
                           <*> traverse (bitraverse subst id) vs
-                          <*> traverse genIntermPDecl ps
+                          <*> traverse genIntermPDecl ps)
 
+genIntermPDecl :: ProcedureDecl String (State St' a) 
+               -> State St' (ProcedureDecl IntermId a)
 genIntermPDecl p = getPDecl <$> bitraverse subst id (PD p)
 
 initSt = St' M.empty

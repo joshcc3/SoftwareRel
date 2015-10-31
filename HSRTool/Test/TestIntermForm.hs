@@ -17,29 +17,21 @@ import qualified Data.Map as M
 import Data.Bitraversable
 
 ex0 = SVarDecl (VarDecl () "x")
-ex1 = SBlockStmt (Either' (Left ()), Either' (Right ()))
-      [SVarDecl (VarDecl () "x")]
-ex2 = SBlockStmt (Either' (Left ()), Either' (Right ()))
-      [SVarDecl (VarDecl () "x"), 
-       SVarDecl (VarDecl () "y"),
-       SAssignStmt (AssignStmt () "x" (ELit 3)),
-       SAssignStmt (AssignStmt () "y" (ELit 3))]
-ex3 = SBlockStmt (Either' (Left ()), Either' (Right ()))
-      [SVarDecl (VarDecl () "x"), ex2, ex1]
+ex1 = S $ SBlockStmt (Either' (Left ()), Either' (Right ()))
+      [S $ SVarDecl (VarDecl () "x")]
+ex2 = S $ SBlockStmt (Either' (Left ()), Either' (Right ()))
+      [S $ SVarDecl (VarDecl () "x"), 
+       S $ SVarDecl (VarDecl () "y"),
+       S $ SAssignStmt (AssignStmt () "x" (ELit 3)),
+       S $ SAssignStmt (AssignStmt () "y" (ELit 3))]
+ex3 = S $ SBlockStmt (Either' (Left ()), Either' (Right ()))
+      [S $ SVarDecl (VarDecl () "x"), ex2, ex1]
 
 ex4' = PDecl (Either' (Left ()), Either' (Right ())) "a" [] [] [] (ELit 3)
-ex4'' = PDecl (Either' (Left ()), Either' (Right ())) "a" [] [] [SVarDecl (VarDecl () "y")] (ELit 3)
+ex4'' = PDecl (Either' (Left ()), Either' (Right ())) "a" [] [] [S $ SVarDecl (VarDecl () "y")] (ELit 3)
 ex4 = Program () [VarDecl () "x"] 
       [ex4']
 
 ex5 = SIfStmt' a
     where 
       a = Centre (Either' (Left (Either' (Left (ELit 3)))))
-{-
-runIntermASTGen p = do
-  res <- runParserTest p
-  either (error . show) (return . intermAST) res
-  
-
-intermAST x = runState (genIntermProg x) initSt
--}

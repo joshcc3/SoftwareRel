@@ -8,7 +8,7 @@ import qualified Data.Set as Set
 import HSRTool.Parser.Types
 
 import HSRTool.CodeGen.Types
-import HSRTool.CodeGen.CGExpr2
+import HSRTool.CodeGen.CodeGen
 
 type IdSMT = String
 type BvSMT = String
@@ -118,7 +118,12 @@ fromNewExpr (lNewE :=> rNewE) =
         bvSmt = fromBoolBinOp "=>" lBvSmt rBvSmt
 
 fromExpr :: ExprSSA -> (BvSMT, IdSMTs)
---fromExpr (EShortIf condE thenE elseE) =
+fromExpr (EShortIf condE thenE elseE) = 
+    (result, Set.unions idSMTsList)
+    where
+        ([condSmt, thenSmt, elseSmt], idSMTsList)
+            = unzip $ map fromExpr [condE, thenE, elseE]
+        result = applyIfThenElse condSmt thenSmt elseSmt
 fromExpr (EBinOp SIfCond (Pair condE (EBinOp SIfAlt (Pair thenE elseE)))) =
     (result, Set.unions idSMTsList)
     where

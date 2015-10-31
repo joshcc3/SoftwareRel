@@ -83,7 +83,6 @@ type ASTInfo = ()
 data Op = Mul | Div | Add | Sub | Mod | LShift | RShift |
           BitXOr | BitAnd | BitOr | GrEq | Gr | Lt | LtEq | NEq |
           Eq | Not | BitNot | LAnd | LOr | LNot | SIfCond | SIfAlt
-
           deriving (Show, Eq, Read, Ord)
 
 data Pair n = Pair { _fst' :: n, _snd' :: n } deriving (Eq, Ord, Show, Read, Functor)
@@ -101,12 +100,22 @@ data Expr op id = EShortIf (Expr op id) (Expr op id) (Expr op id) |
 makePrisms ''Expr
 makeLenses ''Expr
 
-data Program a' id a = Program {
+data Program' a' id a = Program {
       _pInfo :: a,
       _pVarDecls :: [VarDecl id a'],
       _pPDecls :: [ProcedureDecl id a']
 } deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
 
+newtype Program id a = P { _unP :: Program' a id a }
+    deriving (Eq, Ord, Show, Read)
+
+instance Bifunctor Program where
+    bimap f g (P (Program a vs pds))
+        = P $ Program (g a) (map (bimap f g) vs)
+                            (map (getPDecl . bimap f g . PD) pds)
+
+instance Functor (Program id) where
+    fmap f = bimap id f
 
 data VarDecl id a = VarDecl {
       _vInfo :: a,
@@ -468,6 +477,7 @@ makeLenses ''HavocStmt
 makeLenses ''IfStmt'
 makeLenses ''VarDecl
 makeLenses ''Program
+makeLenses ''Program'
 makePrisms ''AltList
 
 instance Foldable (Expr op) where
@@ -661,6 +671,6 @@ pos = (l !!)
       l' = [Either' . Left, Either' . Right]
       l = (.) <$> l' <*> l'
 
-instance Bifunctor (Program a') where
+instance Bifunctor (Program' a') where
     bimap f g (Program a ps pds)
         = Program (g a) ((map.first) f ps) ((map.first) f pds)
