@@ -80,6 +80,13 @@ stmt s = s =>> stmtAction
       stmtAction (SHavocStmt (HavocStmt _ id)) = updateState id
       stmtAction (SBlockStmt (e,_) _)
           = either' (\_ -> openScope) (\_ -> closeScope) e
+      stmtAction (SIfStmt'' a _)
+          = either' (either' enterIf atThen) (either' atElse exitIf) (extract a)
+            where 
+              enterIf _ = _mp <$> get
+              atThen _ = openScope
+              atElse _ = closeScope >> openScope
+              exitIf _ = closeScope
       stmtAction (SIfStmt' a)
           = either' (either' enterIf atThen) (either' atElse exitIf) (extract a)
             where
