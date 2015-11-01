@@ -354,24 +354,37 @@ instance Bitraversable Stmt where
           h' = (traverse.traverse) g
 
 data AssignStmt id a = AssignStmt {
-      _assInfo :: a,
+      _assInfo :: (Either' a, Either' a),
       _assgnID :: id,
       _assgnExpr :: (Expr Op id)
-} deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
+} deriving (Eq, Ord, Show, Read, Functor)
 
 instance Comonad (AssignStmt id) where
-    extract (AssignStmt a _ _) = a
-    duplicate a@(AssignStmt _ i e) = AssignStmt a i e
+    extract (AssignStmt a _ _) = extract (fst a)
+    duplicate a@(AssignStmt (l, r) i e) = AssignStmt (a <$ l, a' <$ r) i e
+        where 
+          a' = AssignStmt (r, l) i e
 
 instance Bifunctor AssignStmt where
     bimap f g (AssignStmt a b e)
-          = AssignStmt (g a) (f b) (fmap f e)
+          = AssignStmt (bimap (fmap g) (fmap g) a) (f b) (fmap f e)
 
 instance Bifoldable AssignStmt where
-    bifoldMap f g = fold . bimap f g
+    bifoldMap f g (AssignStmt (l, r) id e) 
+        = foldMap g l <> f id <> foldMap g r <> foldMap f e
+
+instance Foldable (AssignStmt id) where
+    foldMap = bifoldMap (const mempty)
+
 
 instance Bitraversable AssignStmt where
-    bitraverse f g (AssignStmt a b e) = AssignStmt <$> g a <*> f b <*> traverse f e
+    bitraverse f g (AssignStmt (l, r) b e) 
+        = h <$> traverse g l <*> traverse f e <*> traverse g r <*> f b
+          where 
+            h a b c d = AssignStmt (a, c) d b
+
+instance Traversable (AssignStmt id) where
+    traverse = bitraverse pure
 
 data AssertStmt id a = AssertStmt {
       _assStmtInfo :: a,
@@ -578,7 +591,7 @@ instance Comonad (Stmt id) where
     extract (S x) = extract' x
         where 
           extract' (SVarDecl v) = _vInfo v
-          extract' (SAssignStmt a) = _assInfo a
+          extract' (SAssignStmt a) = extract a
           extract' (SAssertStmt a) = _assStmtInfo a
           extract' (SAssumeStmt a) = _assmeInfo a
           extract' (SHavocStmt h) = _havocInfo h
@@ -588,7 +601,11 @@ instance Comonad (Stmt id) where
           extract' (SIfStmt a _ _ _) = (extract.extract) a^._1
 
     duplicate s@(S(SVarDecl (VarDecl _ id))) = S (SVarDecl (VarDecl s id))
-    duplicate s@(S(SAssignStmt (AssignStmt _ e v))) = S(SAssignStmt (AssignStmt s e v))
+    duplicate s@(S(SAssignStmt (AssignStmt (l, r) e v))) = S(SAssignStmt (AssignStmt a' e v))
+        where
+          a' = (s <$ l, s' <$ r)
+          s' = S (SAssignStmt (AssignStmt (r, l) e v))
+
     duplicate s@(S(SAssertStmt (AssertStmt _ v))) = S(SAssertStmt (AssertStmt s v))
     duplicate s@(S(SAssumeStmt (AssumeStmt _ v))) = S(SAssumeStmt (AssumeStmt s v))
     duplicate s@(S(SHavocStmt (HavocStmt _ v))) = S(SHavocStmt (HavocStmt s v))

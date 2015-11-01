@@ -4,9 +4,6 @@ import qualified Data.Map as M
 import Control.Monad.State
 import HSRTool.Parser.Parser
 import HSRTool.Parser.Types
-import HSRTool.CodeGen.CodeGen
-import HSRTool.CodeGen.Types
-import HSRTool.CodeGen.SMTForm
 import Control.Applicative
 import HSRTool.Utils
 

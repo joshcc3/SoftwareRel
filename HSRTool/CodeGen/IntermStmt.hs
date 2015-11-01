@@ -4,6 +4,7 @@
 module HSRTool.CodeGen.IntermStmt
     (genIntermProg, initSt, IntermId(..), St'(..)) where
 
+--import HSRTool.Test.TestIntermForm
 import Debug.Trace
 import HSRTool.Parser.Types as T
 import HSRTool.CodeGen.Utils
@@ -19,71 +20,63 @@ import Control.Lens
 import qualified Data.Set as S
 import qualified Data.Map as M
 import Data.Bitraversable
-
+import qualified HSRTool.CodeGen.ScopedMap as SM
 
 data IntermId = IntermId {
       _varId :: String,
-      _count :: Int } deriving(Eq, Ord, Read)
+      _count :: Maybe Int } deriving(Eq, Ord, Read)
 instance Show IntermId where
-    show (IntermId v c) = v ++ show c
+    show (IntermId v c) = v ++ maybe "" show c
 makeLenses ''IntermId
 
 type NextCount = Int
-type Mp = M.Map String ([(IntermId, ScopeNum)], NextCount)
+type Mp = SM.ScopedMap String (IntermId, NextCount) 
+
 data St' = St' {
       _mp :: Mp
     } deriving (Eq, Ord, Show, Read)
 makeLenses ''St'
 
-newDef :: (Functor m, MonadState St' m) => String -> m Mp
-newDef id = do
-  mp %= M.alter (update id) id
-  _mp <$> get
-      where 
-
-
-
-updateState :: (Functor m, MonadState St' m) => String -> m Mp
-updateState id = do
-  mp.ix id %= M.alter (update id) id
-  _mp <$> get
-      where
-        updateId id = id & _1.ix 0._1.count .~ view _2 id & _2 %~ (+1)
-
-openScope :: (Functor m, MonadState St' m) => m Mp
-openScope = do
-  mp.traverse._1.ix 0._2 += 1
-  _mp <$> get
-
-closeScope :: (Functor m, MonadState St' m) => m Mp
-closeScope = do
-  mp %= M.mapMaybe g
-  _mp <$> get
-    where
-      g ([], _) = Nothing
-      g (((iId, 0), nextCount):[], _) = Nothing
-      g (((iId, 0), nextCount):r, c) = (r, c)
-      g (((iId, n), nextCount):r, c) = (((iId, n-1), nextCount):r, c)
 subst :: String -> State St' IntermId
-subst s = do
-  st <- get
-  return (lkup (_mp st) s)
+subst id = do
+  map <- _mp <$> get
+  return . maybe (undefVarErr id) fst $ SM.lookup id map
 
-lkup :: [Mp] -> String -> IntermId
-lkup mps var | null val = error "No variable defined in scope"
-            | otherwise = head val
-    where
-      innerMostDef = foldMap (First . M.lookup var) mps
-      val = maybe
-             (error "Uninitialized Variable encountered in lookup")
-             (fst . fst)
-             innerMostDef
+undefVarErr :: String -> a
+undefVarErr varId = error $ "No value present for " ++ varId
+
+openScope :: State St' Mp 
+openScope = do
+  mp %= SM.newScope
+  _mp <$> get
+
+closeScope :: State St' Mp 
+closeScope = do
+  mp %= SM.closeScope
+  _mp <$> get
+
+
+updateId :: (IntermId, NextCount) -> (IntermId, NextCount)
+updateId (id, n) = (id&count .~ Just n, n+1)
+           
+updateState :: String -> State St' Mp
+updateState varId = do
+  m <- _mp <$> get
+  let curId = maybe (undefVarErr varId) id (SM.lookup varId m)
+      newId = updateId curId
+  mp .= SM.updateDef m varId newId
+  _mp <$> get
+
+newDefVal id = (IntermId id (Just 0), 1)
 
 stmt :: Stmt String a -> Stmt String (State St' Mp)
 stmt s = s =>> stmtAction
     where
-      stmtAction (S (SVarDecl (VarDecl _ id))) = newDef id
-      stmtAction (S (SAssignStmt (AssignStmt _ id _))) = updateState id
+      stmtAction (S (SVarDecl (VarDecl _ id))) = do
+        mp %= \x -> SM.newDef x id (newDefVal id)
+        _mp <$> get
+      stmtAction (S (SAssignStmt (AssignStmt (a,_) id _))) 
+          = either' (\_ -> _mp <$> get) (\_ -> updateState id) a
       stmtAction (S (SHavocStmt (HavocStmt _ id))) = updateState id
       stmtAction (S (SBlockStmt (e,_) _))
           = either' (\_ -> openScope) (\_ -> closeScope) e
@@ -96,7 +89,10 @@ stmt s = s =>> stmtAction
                 closeScope
                 openScope
                 return m
-              afterElse _ = closeScope
+              afterElse _ = do
+                m <- _mp <$> get
+                closeScope
+                return m
               exitIf _ = mapM_ updateState (S.elems mset) >> _mp <$> get
                   where 
                     mset = S.union (foldMap modset th) ((foldMap.foldMap) modset el)
@@ -110,10 +106,14 @@ stmt s = s =>> stmtAction
       stmtAction _ = _mp <$> get
 
 vdecl :: VarDecl String a -> VarDecl String (State St' Mp)
-vdecl v = v & vInfo .~ updateState (T._varId v)
+vdecl v@(VarDecl _ id) = v & vInfo .~ do
+                           mp %= \x -> SM.newDef x id (newDefVal id)
+                           _mp <$> get
 
 fparams :: FormalParam String a -> FormalParam String (State St' Mp)
-fparams v = v & fpInfo .~ updateState (_fID v)
+fparams f@(FParam _ id) = f & fpInfo .~ do
+                            mp %= \x -> SM.newDef x id (newDefVal id)
+                            _mp <$> get
 
 prePost :: PrePost id a -> PrePost id (State St' Mp)
 prePost p = (_mp <$> get) <$ p
@@ -127,7 +127,11 @@ procedureDecl p = g (p =>> pdAction)
 pdAction p = do
         let pInfo = fst (_pdeclInfo p)
             pName = _pId p
-        either' (\_ -> updateState pName >> openScope) (\_ -> closeScope) pInfo
+        either' (\_ -> do
+                   mp %= \x -> SM.newDef x pName (newDefVal pName)
+                   openScope) 
+                (\_ -> closeScope) 
+                pInfo
 
 program :: Program String a -> Program String (State St' Mp)
 program (P (Program _ vs ps))

@@ -2,7 +2,6 @@
 
 module HSRTool.Test.TestIntermForm where
 
-import HSRTool.CodeGen.IntermStmt
 import HSRTool.Parser.Types
 
 import Control.Monad.State
@@ -22,8 +21,8 @@ ex1 = S $ SBlockStmt (Either' (Left ()), Either' (Right ()))
 ex2 = S $ SBlockStmt (Either' (Left ()), Either' (Right ()))
       [S $ SVarDecl (VarDecl () "x"), 
        S $ SVarDecl (VarDecl () "y"),
-       S $ SAssignStmt (AssignStmt () "x" (ELit 3)),
-       S $ SAssignStmt (AssignStmt () "y" (ELit 3))]
+       S $ SAssignStmt (AssignStmt (Either' (Left ()), Either' (Right ())) "x" (ELit 3)),
+       S $ SAssignStmt (AssignStmt (Either' (Left ()), Either' (Right ())) "y" (ELit 3))]
 ex3 = S $ SBlockStmt (Either' (Left ()), Either' (Right ()))
       [S $ SVarDecl (VarDecl () "x"), ex2, ex1]
 
@@ -35,3 +34,4 @@ ex4 = Program () [VarDecl () "x"]
 ex5 = SIfStmt' a
     where 
       a = Centre (Either' (Left (Either' (Left (ELit 3)))))
+

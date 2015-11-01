@@ -14,6 +14,7 @@ import Text.Parsec hiding (State, parse)
 import HSRTool.CodeGen.SMTForm
 import Data.Bifunctor
 import Control.Monad.Error
+import Data.Maybe
 
 type FileContent = String
 
@@ -25,6 +26,7 @@ pipeline inp =
 
 func ast = case runState (genIntermProg ast) (St' M.empty) of
              (intermProg, _) -> do
+               print intermProg
                getLine
                ssa <-  runSSAGenerator (trans1 intermProg)
                mapM_ print ssa
@@ -33,11 +35,12 @@ func ast = case runState (genIntermProg ast) (St' M.empty) of
                mapM_ putStrLn serializedSSA
 
 s = [ S (SIfStmt (Either' (Left (Either' (Left ((),(),(),()))))) (ELit 1) [] Nothing)]
---s = [S (SVarDecl (VarDecl () "x")), S (SAssignStmt (AssignStmt () "x" (ELit 1)))]
-pd = PDecl (Either' (Left ()), Either' (Right ())) [] [] [] s (ELit 1)
-prog = P (Program () [] [pd])
---massage :: Program IntermId Mp -> Program IntermId (M String IntermId)
-trans1 = (fmap.fmap) (head.fst)
+
+trans1 = (fmap.M.mapMaybe) (fmap (fst.fst).listToMaybe)
+
+--Map String IntermId
+--Map String [((IntermId, NextCount), Count)]
+
 
 trans2 :: SSA Op IntermId -> SSA Op NewId
 trans2 = fmap (bimap f g)
@@ -45,8 +48,8 @@ trans2 = fmap (bimap f g)
       g = fmap f
       f i = NewId c vId
           where 
-            c = IS._count i
-            vId = IS._varId i ++ show c
+            c = maybe 0 id (IS._count i)
+            vId = IS._varId i ++ maybe "" show (IS._count i)
 
 correctInputFile x = readFile (correctPrefix </> x)
 incorrectInputFile x = readFile (incorrectPrefix </> x)

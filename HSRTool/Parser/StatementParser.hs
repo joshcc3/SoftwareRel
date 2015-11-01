@@ -36,7 +36,7 @@ assignStmt = do
   many space
   string semicolonT
   many space
-  return (AssignStmt () i e)
+  return (AssignStmt (Either' (Left ()), Either' (Right ())) i e)
 assertStmt = do
   string assertK
   many space

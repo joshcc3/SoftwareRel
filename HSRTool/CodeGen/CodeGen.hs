@@ -60,10 +60,11 @@ toSSA (S (SAssignStmt (AssignStmt _ v e))) p = tell [SSAAssign v (NE e)]
 toSSA (S (SAssertStmt (AssertStmt _ e))) p = do
   assmpts <- _ass <$> get
   tell [SSAAssert ((NEBinOp LAnd (NE p) assmpts) :=> NE e)]
-toSSA (S (SBlockStmt _ l)) p = toSSA (last l) p
+toSSA (S (SBlockStmt _ l)) p = mapM_ (\ x -> toSSA x p) l
 toSSA (S (SIfStmt aInfo e tn el)) p = do
   let
-      (_, thenMap, elseMap, exitMap) = (extract . extract) aInfo
+      (entryMap, thenMap, elseMap, exitMap) = (extract . extract) aInfo
+      elseMap' = maybe entryMap (const elseMap) el
       thenModset = foldMap (S.map _varId . modset) tn
       elseModset = (foldMap.foldMap) (S.map _varId . modset) el
       thenCond = EBinOp LAnd (Pair p e)
@@ -71,7 +72,7 @@ toSSA (S (SIfStmt aInfo e tn el)) p = do
       g v = tell [SSAAssign (lkup exitMap v)
                   (NE $ EShortIf e
                           (EID $ lkup thenMap v) 
-                          (EID $ lkup elseMap v))]
+                          (EID $ lkup elseMap' v))]
   mapM_ (\x -> toSSA x thenCond) tn
   mapM_ (\x -> toSSA x elseCond) (maybe [] id el)
   mapM_ g (S.elems (S.union thenModset elseModset))
@@ -92,3 +93,4 @@ modset (S(SBlockStmt _ stmts)) = foldMap modset stmts
 lkup m v = case M.lookup v m of
              Just x -> x
              Nothing -> error ("Undefined variable in lookup: " ++ v)
+
