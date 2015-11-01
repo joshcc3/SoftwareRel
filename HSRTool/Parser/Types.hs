@@ -238,11 +238,11 @@ data Stmt' n a' id a = SVarDecl { _svdVDecl :: (VarDecl id a') } |
             SAssertStmt { _sassAStmt :: (AssertStmt id a') } |
             SAssumeStmt { _sassumeStmt :: (AssumeStmt id a') } |
             SHavocStmt { _shHavocStmt :: (HavocStmt id a') } |
-            SIfStmt { _sifIfStmt :: (IfStmt' n id a) } |
+            SIfStmt'' { _sifIfStmt :: (IfStmt' n id a) } |
             SBlockStmt { _sbAInfo :: (Either' a, Either' a),
                        _sbBlockStmt :: [n id a] } |
             SIfStmt' { _sifIfStmt' :: AltList (IfInfo n id a) (Either' (Either' a)) } |
-            SIfStmt'' { _ifInfo'' :: Either' (Either' (a, a, a, a)),
+            SIfStmt { _ifInfo'' :: Either' (Either' (a, a, a, a)),
                         _ifExpr'' :: Expr Op id,
                         _ifThenB'' :: [n id a],
                         _ifElseB'' :: Maybe [n id a]
@@ -265,7 +265,7 @@ instance Bifunctor Stmt where
     bimap f g (S (SAssertStmt as)) = S $ SAssertStmt (bimap f g as)
     bimap f g (S (SAssumeStmt s)) = S $ SAssumeStmt (bimap f g s)
     bimap f g (S (SHavocStmt h)) = S $ SHavocStmt  (bimap f g h)
-    bimap f g (S (SIfStmt i)) = S $ SIfStmt  (bimap f g i)
+    bimap f g (S (SIfStmt'' i)) = S $ SIfStmt''  (bimap f g i)
     bimap f g (S (SBlockStmt (l, r) s))
         = S $ SBlockStmt (fmap g l, fmap g r) (map (bimap f g) s)
     bimap f g (S (SIfStmt' a)) = S $ SIfStmt' (bimap h h' a)
@@ -273,8 +273,8 @@ instance Bifunctor Stmt where
           h' = (fmap . fmap) g
           h =  bimap (bimap (fmap f) (bimap (fmap f) (fmap (bimap f g))))
                (fmap (bimap (fmap f) (fmap (bimap f g))))
-    bimap f g (S (SIfStmt'' a e th el)) 
-        = S $ SIfStmt'' ((fmap.fmap) (\x -> x&each %~ g) a) (fmap f e) (fmap (bimap f g) th)
+    bimap f g (S (SIfStmt a e th el)) 
+        = S $ SIfStmt ((fmap.fmap) (\x -> x&each %~ g) a) (fmap f e) (fmap (bimap f g) th)
           ((fmap.fmap) (bimap f g) el)
 {-
 naturality
@@ -290,10 +290,10 @@ instance Bifoldable Stmt where
     bifoldMap f g (S (SAssertStmt a)) = bifoldMap f g a
     bifoldMap f g (S (SAssumeStmt a)) = bifoldMap f g a
     bifoldMap f g (S (SHavocStmt h)) = bifoldMap f g h
-    bifoldMap f g (S (SIfStmt i)) = bifoldMap f g i
+    bifoldMap f g (S (SIfStmt'' i)) = bifoldMap f g i
     bifoldMap f g (S (SBlockStmt (l, r) s)) 
         = foldMap g l <> foldMap (bifoldMap f g) s <> foldMap g r
-    bifoldMap f g (S (SIfStmt'' a e th el))
+    bifoldMap f g (S (SIfStmt a e th el))
         = g a1 <> 
           foldMap f e <> 
           foldMap (bifoldMap f g) th <> g a2 <> 
@@ -325,21 +325,21 @@ instance Bitraversable Stmt where
     bitraverse f g (S (SAssertStmt as)) = S . SAssertStmt <$>  (bitraverse f g as)
     bitraverse f g (S (SAssumeStmt s)) = S . SAssumeStmt <$> (bitraverse f g s)
     bitraverse f g (S (SHavocStmt h)) = S . SHavocStmt <$> (bitraverse f g h)
-    bitraverse f g (S (SIfStmt i)) = S . SIfStmt <$> (bitraverse f g i)
+    bitraverse f g (S (SIfStmt'' i)) = S . SIfStmt'' <$> (bitraverse f g i)
     bitraverse f g (S (SBlockStmt (l, r) s))
         = h <$> traverse g l
           <*> traverse (bitraverse f g) s
           <*> traverse g r
         where
           h x y z = S (SBlockStmt (x, z) y)
-    bitraverse f g (S (SIfStmt'' aInfo e th el))
+    bitraverse f g (S (SIfStmt aInfo e th el))
         = h <$> g enterIf <*>
           traverse f e <*>
           traverse (bitraverse f g) th <*> g afterThen <*>
           (traverse.traverse) (bitraverse f g) el <*> g afterElse <*>
           g exitIf
         where 
-          h a b c d e f g = S (SIfStmt'' ((fmap.fmap) (const (a,d,f,g)) aInfo) b c e)
+          h a b c d e f g = S (SIfStmt ((fmap.fmap) (const (a,d,f,g)) aInfo) b c e)
           (enterIf, afterThen, afterElse, exitIf)
               = either' (either' id (\(b,a,c,d) -> (a,b,c,d)))
                 (either' (\(c,a,b,d) -> (a,b,c,d))
@@ -582,25 +582,25 @@ instance Comonad (Stmt id) where
           extract' (SAssertStmt a) = _assStmtInfo a
           extract' (SAssumeStmt a) = _assmeInfo a
           extract' (SHavocStmt h) = _havocInfo h
-          extract' (SIfStmt i) = _ifInfo i
+          extract' (SIfStmt'' i) = _ifInfo i
           extract' (SBlockStmt e _) = either' id id . fst $ e
           extract' (SIfStmt' a) = extract . extract . extract $ a
-          extract' (SIfStmt'' a _ _ _) = (extract.extract) a^._1
+          extract' (SIfStmt a _ _ _) = (extract.extract) a^._1
 
     duplicate s@(S(SVarDecl (VarDecl _ id))) = S (SVarDecl (VarDecl s id))
     duplicate s@(S(SAssignStmt (AssignStmt _ e v))) = S(SAssignStmt (AssignStmt s e v))
     duplicate s@(S(SAssertStmt (AssertStmt _ v))) = S(SAssertStmt (AssertStmt s v))
     duplicate s@(S(SAssumeStmt (AssumeStmt _ v))) = S(SAssumeStmt (AssumeStmt s v))
     duplicate s@(S(SHavocStmt (HavocStmt _ v))) = S(SHavocStmt (HavocStmt s v))
-    duplicate s@(S(SIfStmt ifS@(IfStmt _ e st els )))
-        = S(SIfStmt (IfStmt s e (map duplicate st) ((fmap.map) duplicate els)))
+    duplicate s@(S(SIfStmt'' ifS@(IfStmt _ e st els )))
+        = S(SIfStmt'' (IfStmt s e (map duplicate st) ((fmap.map) duplicate els)))
     duplicate s@(S(SBlockStmt (l, r) st))
         = S(SBlockStmt a' (fmap duplicate st))
         where
           a' = (s <$ l, s' <$ r)
           s' = S (SBlockStmt (r, l) st)
-    duplicate s@(S(SIfStmt'' a e th el))
-        = S(SIfStmt''
+    duplicate s@(S(SIfStmt a e th el))
+        = S(SIfStmt
             ((fmap.fmap) (const (s, s', s'', s''')) a)
             e 
             (map duplicate th)
@@ -610,9 +610,9 @@ instance Comonad (Stmt id) where
                              (either' id (\(b,a,c,d) -> (a,b,c,d)))
                              (either' (\(c,a,b,d) -> (a,b,c,d))
                                        (\(d,a,b,c) -> (a,b,c,d))) a
-          s' = S (SIfStmt'' ((fmap.fmap) (const a') a) e th el)
-          s'' = S (SIfStmt'' ((fmap.fmap) (const a'') a) e th el)
-          s''' = S (SIfStmt'' ((fmap.fmap) (const a''') a) e th el)
+          s' = S (SIfStmt (pos 1 a') e th el)
+          s'' = S (SIfStmt (pos 2 a'') e th el)
+          s''' = S (SIfStmt (pos 3 a''') e th el)
           a' = (a2, a1, a3, a4)
           a'' = (a3, a1, a2, a4)
           a''' = (a4, a1, a2, a3)

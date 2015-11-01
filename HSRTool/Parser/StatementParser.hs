@@ -120,7 +120,7 @@ ifStmt'' = do
   return (toIfSt e b b')
       where
         toIfSt e b b' 
-            = SIfStmt'' (pos 0 ((), (), (), ())) e b b'
+            = SIfStmt (pos 0 ((), (), (), ())) e b b'
 blockStmt = do
   string ocurlyT
   many space

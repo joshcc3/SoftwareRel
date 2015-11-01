@@ -178,3 +178,5 @@ randomStream r = do
   let s = snd $ SR.genRange x
   return $ map ((`div`s) . (*r) . fst) (iterate (SR.next . snd) (SR.next x))
 
+
+tf m x = trace ("Trace " ++ m ++ ":  " ++ show x) x

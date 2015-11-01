@@ -4,6 +4,7 @@
 module HSRTool.CodeGen.IntermStmt
     (genIntermProg, initSt, IntermId(..), St'(..)) where
 
+import Debug.Trace
 import HSRTool.Parser.Types as T
 import HSRTool.CodeGen.Utils
 import Control.Monad.State hiding (mapM_)
@@ -28,28 +29,31 @@ instance Show IntermId where
 makeLenses ''IntermId
 
 type NextCount = Int
-type Mp = M.Map String ([IntermId], NextCount)
+type Mp = M.Map String ([(IntermId, ScopeNum)], NextCount)
 data St' = St' {
       _mp :: Mp
     } deriving (Eq, Ord, Show, Read)
 makeLenses ''St'
 
+newDef :: (Functor m, MonadState St' m) => String -> m Mp
+newDef id = do
+  mp %= M.alter (update id) id
+  _mp <$> get
+      where 
+
+
+
 updateState :: (Functor m, MonadState St' m) => String -> m Mp
 updateState id = do
-  mp %= M.alter (upd id) id
+  mp.ix id %= M.alter (update id) id
   _mp <$> get
       where
-        upd id = Just . maybe (freshId id) updateId
-        freshId id = ([IntermId id 1], 2)
-        updateId id =  id & _1.ix 0.count .~ view _2 id & _2 %~ (+1)
+        updateId id = id & _1.ix 0._1.count .~ view _2 id & _2 %~ (+1)
 
 openScope :: (Functor m, MonadState St' m) => m Mp
 openScope = do
-  mp.traverse._1 %= g
+  mp.traverse._1.ix 0._2 += 1
   _mp <$> get
-    where
-      g [] = []
-      g (x:xs) = x:x:xs
 
 closeScope :: (Functor m, MonadState St' m) => m Mp
 closeScope = do
@@ -57,35 +61,41 @@ closeScope = do
   _mp <$> get
     where
       g ([], _) = Nothing
-      g (_:[], _) = Nothing
-      g x = Just (x & _1 %~ tail)
+      g (((iId, 0), nextCount):[], _) = Nothing
+      g (((iId, 0), nextCount):r, c) = (r, c)
+      g (((iId, n), nextCount):r, c) = (((iId, n-1), nextCount):r, c)
 subst :: String -> State St' IntermId
 subst s = do
   st <- get
   return (lkup (_mp st) s)
 
-lkup :: Mp -> String -> IntermId
-lkup mp var | null val = error "No variable defined in scope"
+lkup :: [Mp] -> String -> IntermId
+lkup mps var | null val = error "No variable defined in scope"
             | otherwise = head val
     where
+      innerMostDef = foldMap (First . M.lookup var) mps
       val = maybe
              (error "Uninitialized Variable encountered in lookup")
-             fst
-             (M.lookup var mp)
+             (fst . fst)
+             innerMostDef
 
 stmt :: Stmt String a -> Stmt String (State St' Mp)
 stmt s = s =>> stmtAction
     where
-      stmtAction (S (SVarDecl (VarDecl _ id))) = updateState id
+      stmtAction (S (SVarDecl (VarDecl _ id))) = newDef id
       stmtAction (S (SAssignStmt (AssignStmt _ id _))) = updateState id
       stmtAction (S (SHavocStmt (HavocStmt _ id))) = updateState id
       stmtAction (S (SBlockStmt (e,_) _))
           = either' (\_ -> openScope) (\_ -> closeScope) e
-      stmtAction (S (SIfStmt'' a _ th el))
+      stmtAction (S (SIfStmt a _ th el))
           = either' (either' enterIf afterThen) (either' afterElse exitIf) a
             where 
               enterIf _ = openScope
-              afterThen _ = closeScope >> openScope
+              afterThen _ = do
+                m <- _mp <$> get
+                closeScope
+                openScope
+                return m
               afterElse _ = closeScope
               exitIf _ = mapM_ updateState (S.elems mset) >> _mp <$> get
                   where 
