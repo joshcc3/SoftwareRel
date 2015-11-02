@@ -24,7 +24,7 @@ pipeline inp =
     Left x -> error $ "Could not parse file: " ++ show x
     Right ast -> func ast
 
-func ast = case runState (genIntermProg ast) (St' M.empty) of
+func ast = case runState (toIntermediateForm ast) (St' M.empty M.empty) of
              (intermProg, _) -> do
                print intermProg
                getLine
@@ -36,7 +36,8 @@ func ast = case runState (genIntermProg ast) (St' M.empty) of
 
 s = [ S (SIfStmt (Either' (Left (Either' (Left ((),(),(),()))))) (ELit 1) [] Nothing)]
 
-trans1 = (fmap.M.mapMaybe) (fmap (fst.fst).listToMaybe)
+
+trans1 = (fmap.M.mapMaybe) (fmap fst.listToMaybe)
 
 --Map String IntermId
 --Map String [((IntermId, NextCount), Count)]
@@ -47,9 +48,9 @@ trans2 = fmap (bimap f g)
     where
       g = fmap f
       f i = NewId c vId
-          where 
-            c = maybe 0 id (IS._count i)
-            vId = IS._varId i ++ maybe "" show (IS._count i)
+          where
+            c = maybe 0 id (IS._countIntermId i)
+            vId = IS._varId i ++ maybe "" show (IS._countIntermId i)
 
 correctInputFile x = readFile (correctPrefix </> x)
 incorrectInputFile x = readFile (incorrectPrefix </> x)

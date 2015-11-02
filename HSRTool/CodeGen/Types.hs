@@ -5,6 +5,7 @@ module HSRTool.CodeGen.Types where
 import qualified Data.Map as M
 import HSRTool.Parser.Types
 import Control.Monad
+import qualified HSRTool.CodeGen.ScopedMap as SM
 import Control.Monad.Free
 import Control.Lens
 
@@ -47,3 +48,23 @@ type NewExprSSA = NewExpr Op NewId
 type PropSSAs = [ExprSSA]
 
 type StmtSSAs = SSA Op NewId
+
+-- The IntermId is simply the SSA id
+data IntermId = IntermId {
+      _varId :: String,
+      _countIntermId :: Maybe Int } deriving(Eq, Ord, Read)
+makeLenses ''IntermId
+
+instance Show IntermId where
+    show (IntermId v c) = v ++ maybe "" show c
+
+type NextCount = Int
+-- TODO: Give this a better name)
+type Mp = SM.ScopedMap String IntermId
+
+-- TODO: Give this a better name
+data St' = St' {
+      _mp :: Mp,
+      _countMap :: M.Map String Int
+    } deriving (Eq, Ord, Show, Read)
+makeLenses ''St'

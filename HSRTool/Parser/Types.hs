@@ -23,9 +23,10 @@ import Data.Bifoldable
 import Data.Bitraversable
 import Data.Bifunctor
 import Control.Lens
+import Control.DeepSeq
 
 newtype Either' a = Either' { _unE :: Either a a }
-    deriving(Eq, Ord, Read, Show)
+    deriving(Eq, Ord, Read, Show, NFData)
 makeLenses ''Either'
 
 either' f g (Either' (Left x)) = f x
@@ -273,7 +274,7 @@ instance Bifunctor Stmt where
           h' = (fmap . fmap) g
           h =  bimap (bimap (fmap f) (bimap (fmap f) (fmap (bimap f g))))
                (fmap (bimap (fmap f) (fmap (bimap f g))))
-    bimap f g (S (SIfStmt a e th el)) 
+    bimap f g (S (SIfStmt a e th el))
         = S $ SIfStmt ((fmap.fmap) (\x -> x&each %~ g) a) (fmap f e) (fmap (bimap f g) th)
           ((fmap.fmap) (bimap f g) el)
 {-
@@ -291,34 +292,34 @@ instance Bifoldable Stmt where
     bifoldMap f g (S (SAssumeStmt a)) = bifoldMap f g a
     bifoldMap f g (S (SHavocStmt h)) = bifoldMap f g h
     bifoldMap f g (S (SIfStmt'' i)) = bifoldMap f g i
-    bifoldMap f g (S (SBlockStmt (l, r) s)) 
+    bifoldMap f g (S (SBlockStmt (l, r) s))
         = foldMap g l <> foldMap (bifoldMap f g) s <> foldMap g r
     bifoldMap f g (S (SIfStmt a e th el))
-        = g a1 <> 
-          foldMap f e <> 
-          foldMap (bifoldMap f g) th <> g a2 <> 
-          (foldMap.foldMap) (bifoldMap f g) el <> g a3 <> 
+        = g a1 <>
+          foldMap f e <>
+          foldMap (bifoldMap f g) th <> g a2 <>
+          (foldMap.foldMap) (bifoldMap f g) el <> g a3 <>
           g a4
-        where 
-          (a1, a2, a3, a4) = either' 
+        where
+          (a1, a2, a3, a4) = either'
                              (either' id (\(b,a,c,d) -> (a,b,c,d)))
                              (either' (\(c,a,b,d) -> (a,b,c,d))
                                       (\(d,a,b,c) -> (a,b,c,d))) a
     bifoldMap f g (S (SIfStmt' a))
-        = bifoldMap 
-          (bifoldMap 
-           (bifoldMap 
-            (foldMap f) 
-            (bifoldMap 
+        = bifoldMap
+          (bifoldMap
+           (bifoldMap
+            (foldMap f)
+            (bifoldMap
              (foldMap f)
              (foldMap (bifoldMap f g))))
-           (foldMap 
+           (foldMap
             (bifoldMap
              (foldMap f)
              (foldMap (bifoldMap f g)))))
           (foldMap (foldMap g))
           a
-          
+
 instance Bitraversable Stmt where
     bitraverse f g (S (SVarDecl d)) = S . SVarDecl <$> (bitraverse f g d)
     bitraverse f g (S (SAssignStmt a')) = S . SAssignStmt <$>  (bitraverse f g a')
@@ -338,7 +339,7 @@ instance Bitraversable Stmt where
           traverse (bitraverse f g) th <*> g afterThen <*>
           (traverse.traverse) (bitraverse f g) el <*> g afterElse <*>
           g exitIf
-        where 
+        where
           h a b c d e f g = S (SIfStmt ((fmap.fmap) (const (a,d,f,g)) aInfo) b c e)
           (enterIf, afterThen, afterElse, exitIf)
               = either' (either' id (\(b,a,c,d) -> (a,b,c,d)))
@@ -362,7 +363,7 @@ data AssignStmt id a = AssignStmt {
 instance Comonad (AssignStmt id) where
     extract (AssignStmt a _ _) = extract (fst a)
     duplicate a@(AssignStmt (l, r) i e) = AssignStmt (a <$ l, a' <$ r) i e
-        where 
+        where
           a' = AssignStmt (r, l) i e
 
 instance Bifunctor AssignStmt where
@@ -370,7 +371,7 @@ instance Bifunctor AssignStmt where
           = AssignStmt (bimap (fmap g) (fmap g) a) (f b) (fmap f e)
 
 instance Bifoldable AssignStmt where
-    bifoldMap f g (AssignStmt (l, r) id e) 
+    bifoldMap f g (AssignStmt (l, r) id e)
         = foldMap g l <> f id <> foldMap g r <> foldMap f e
 
 instance Foldable (AssignStmt id) where
@@ -378,9 +379,9 @@ instance Foldable (AssignStmt id) where
 
 
 instance Bitraversable AssignStmt where
-    bitraverse f g (AssignStmt (l, r) b e) 
+    bitraverse f g (AssignStmt (l, r) b e)
         = h <$> traverse g l <*> traverse f e <*> traverse g r <*> f b
-          where 
+          where
             h a b c d = AssignStmt (a, c) d b
 
 instance Traversable (AssignStmt id) where
@@ -459,8 +460,8 @@ instance Bifunctor n => Bifunctor (IfStmt' n) where
           = IfStmt (g a) (fmap f e) (fmap (bimap f g) t) ((fmap.fmap) (bimap f g) els)
 
 instance (Bifunctor n, Bifoldable n) => Bifoldable (IfStmt' n) where
-    bifoldMap f g (IfStmt a e th el) 
-        = g a <> foldMap f e <> foldMap (bifoldMap f g) th 
+    bifoldMap f g (IfStmt a e th el)
+        = g a <> foldMap f e <> foldMap (bifoldMap f g) th
           <> ((foldMap.foldMap) (bifoldMap f g) el)
 
 instance Bitraversable n => Bitraversable (IfStmt' n) where
@@ -586,10 +587,10 @@ return a >>= f ~ f a
 m >>= return ~ m
 (m >>= f) >>= g ~ m >>= (f >>= g)
 -}
-    
+
 instance Comonad (Stmt id) where
     extract (S x) = extract' x
-        where 
+        where
           extract' (SVarDecl v) = _vInfo v
           extract' (SAssignStmt a) = extract a
           extract' (SAssertStmt a) = _assStmtInfo a
@@ -619,11 +620,11 @@ instance Comonad (Stmt id) where
     duplicate s@(S(SIfStmt a e th el))
         = S(SIfStmt
             ((fmap.fmap) (const (s, s', s'', s''')) a)
-            e 
+            e
             (map duplicate th)
             ((fmap.map) duplicate el))
         where
-          (a1, a2, a3, a4) = either' 
+          (a1, a2, a3, a4) = either'
                              (either' id (\(b,a,c,d) -> (a,b,c,d)))
                              (either' (\(c,a,b,d) -> (a,b,c,d))
                                        (\(d,a,b,c) -> (a,b,c,d))) a
