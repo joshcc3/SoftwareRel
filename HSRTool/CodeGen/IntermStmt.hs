@@ -129,7 +129,7 @@ stmt s = s =>> stmtAction
               atThen = (\_ -> openScope)
               atElse = (\_ -> closeScope >> openScope)
               exitIf = (\_ -> closeScope)
-      stmtAction (S (SAssertStmt (AssertStmt a e))) = _mp <$> get
+      stmtAction _ = _mp <$> get
 
 vdecl :: VarDecl String () -> VarDecl String (State St' Mp)
 vdecl v@(VarDecl _ id) = v & vInfo .~ do
