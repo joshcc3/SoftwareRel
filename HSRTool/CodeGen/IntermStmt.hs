@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase, TemplateHaskell #-}
 
 module HSRTool.CodeGen.IntermStmt
-    (genIntermProg, initSt, IntermId(..), St'(..)) where
+    (program, initSt, IntermId(..), St'(..)) where
 
 --import HSRTool.Test.TestIntermForm
 import Debug.Trace
@@ -69,9 +69,15 @@ updateState varId = do
 
 newDefVal id = (IntermId id (Just 0), 1)
 
-stmt :: Stmt String a -> Stmt String (State St' Mp)
-stmt s = s =>> stmtAction
-    where
+stmt :: Stmt String a -> State St' (Stmt String Mp)
+stmt s = undefined --res
+    where 
+      zipTrees (S (SVarDecl x)) (S (SVarDecl x')) = S (SVarDecl (x' & vInfo .~ (x ^.vInfo)))
+      zipTrees (S (SAssignStmt x)) (S (SAssignStmt x')) = (S (SAssignStmt (x' & assInfo .~ (x ^. assInfo)))) 
+      zipTrees (S (SHavocStmt x)) (S (SHavocStmt x')) = (S (SHavocStmt (x' & havocInfo .~ (x ^. havocInfo))))
+      zipTrees (S (SBlockStmt x sts')) (S (SBlockStmt x' sts)) = S (SBlockStmt x (zipWith zipTrees sts' sts))
+      zipTrees (S (SIfStmt a _ th' el')) (S (SIfStmt _ e th el)) = S (SIfStmt a e (zipWith zipTrees th' th) (zipWith zipTrees <$> el' <*> el))
+      res = undefined -- fmap (\s' -> traverse id (zipTrees s' s =>> stmtAction)) res
       stmtAction (S (SVarDecl (VarDecl _ id))) = do
         mp %= \x -> SM.newDef x id (newDefVal id)
         _mp <$> get
@@ -84,15 +90,14 @@ stmt s = s =>> stmtAction
           = either' (either' enterIf afterThen) (either' afterElse exitIf) a
             where 
               enterIf _ = openScope
-              afterThen _ = do
-                m <- _mp <$> get
+              afterThen (_, oldMap, _, _) = do
                 closeScope
+                m <- _mp <$> get
                 openScope
+                mp .= oldMap
                 return m
               afterElse _ = do
-                m <- _mp <$> get
                 closeScope
-                return m
               exitIf _ = mapM_ updateState (S.elems mset) >> _mp <$> get
                   where 
                     mset = S.union (foldMap modset th) ((foldMap.foldMap) modset el)
@@ -118,31 +123,23 @@ fparams f@(FParam _ id) = f & fpInfo .~ do
 prePost :: PrePost id a -> PrePost id (State St' Mp)
 prePost p = (_mp <$> get) <$ p
 
-procedureDecl :: ProcedureDecl String a -> ProcedureDecl String (State St' Mp)
-procedureDecl p = g (p =>> pdAction)
-    where
-      g (PDecl i id fp pp sts e)
-          = PDecl i id (map fparams fp) (map prePost pp) (map stmt sts) e
 
-pdAction p = do
+procedureDecl :: ProcedureDecl String a -> State St' (ProcedureDecl String Mp)
+procedureDecl p = undefined {-traverse id-} (p =>> pdaction) 
+    where 
+      pdaction :: ProcedureDecl String a -> State St' Mp
+      pdaction p = do
         let pInfo = fst (_pdeclInfo p)
             pName = _pId p
         either' (\_ -> do
                    mp %= \x -> SM.newDef x pName (newDefVal pName)
-                   openScope) 
-                (\_ -> closeScope) 
+                   openScope)
+                (\_ -> closeScope)
                 pInfo
 
-program :: Program String a -> Program String (State St' Mp)
-program (P (Program _ vs ps))
-      = P (Program (_mp <$> get) (map vdecl vs) (map procedureDecl ps))
-
-genIntermProg :: Program String a -> State St' (Program IntermId Mp)
-genIntermProg p
-    = case program p of
-        P (Program a vs ps) -> P <$> (Program <$> a
-                          <*> traverse (bitraverse subst id) vs
-                          <*> traverse genIntermPDecl ps)
+program :: Program String a -> State St' (Program String Mp)
+program (P (Program a vs ps))
+      = P <$> (Program <$> (_mp <$> get) <*> ((traverse.traverse) id . map vdecl $ vs) <*> (traverse procedureDecl ps))
 
 genIntermPDecl :: ProcedureDecl String (State St' a) 
                -> State St' (ProcedureDecl IntermId a)
