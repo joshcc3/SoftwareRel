@@ -10,6 +10,7 @@ import Control.Monad.State
 import HSRTool.Parser.Utils
 import HSRTool.Parser.Types
 import Data.Bifunctor
+import HSRTool.Utils
 
 type P u a = Parsec String u a
 
@@ -81,7 +82,7 @@ parseExpr = tokeniseExpr >>= toRPN >>= fmap (head . fst) . go []
       go l [] = return (l, [])
       go l (OutVal i:r) = go (ELit i:l) r
       go l (OutVar id:r) = go (EID id:l) r
-      go l (OutResult:r) = go (EResult:l) r
+      go l (OutResult:r) = go (EID specialId:l) r
       go l (OutOld id:r) = go (EOld id:l) r
       go [e1] (OutOp op:r) = either
                              (\_ ->  fail "Bad Expr")

@@ -1,4 +1,4 @@
-module HSRTool.CodeGen.ScopedMap(ScopedMap(..), newScope, closeScope, newDef, updateDef, lookup) where
+module HSRTool.CodeGen.ScopedMap(ScopedMap(..), empty, newScope, closeScope, newDef, updateDef, lookup) where
 
 {- |
      This module provides an implementation of a ScopedMap.
@@ -16,6 +16,8 @@ import Prelude hiding (lookup)
 type ScopeNum = Int
 
 type ScopedMap a b = M.Map a [(b,ScopeNum)]
+
+empty = M.empty
 
 lookup :: Ord a => a -> ScopedMap a b -> Maybe b
 lookup a m = fmap fst . listToMaybe $ m^.ix a

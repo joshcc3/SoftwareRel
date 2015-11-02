@@ -9,6 +9,7 @@ import Data.Foldable
 import Data.Monoid
 import qualified Data.Set as S
 import HSRTool.CodeGen.Types
+import HSRTool.Utils
 import HSRTool.Parser.Types
 import Control.Comonad
 import Control.Lens
@@ -64,3 +65,5 @@ bitraversePDecl f g (PD (PDecl (l, r) vId fp pp sts e))
        <*> traverse g r)
     where
       h l a b c d e r = PDecl (l, r) a b c d e
+
+specialIntermId = IntermId specialId (Just 1)

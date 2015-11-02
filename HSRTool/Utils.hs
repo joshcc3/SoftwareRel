@@ -51,7 +51,7 @@ swap (x, y) = (y, x)
 escape c = flip (>>=) repl
  where
    repl x | x == c =  ['\\', c]
-   	  | otherwise = [x]
+          | otherwise = [x]
 
 groupWith :: (a -> a -> Bool) -> (a -> a -> Ordering) -> [a] -> [[a]]
 groupWith f g = groupBy f . sortBy g
@@ -79,18 +79,18 @@ data KMP a = KMP { done :: Bool, next :: a -> KMP a }
 
 table :: Eq a => [a] -> KMP a -> KMP a
 table = f
-    where 
+    where
       f [] fail = KMP True (const (f [] fail))
       f (a:as) fail = KMP False g
-          where 
+          where
             g a' | a == a' = f as (next fail a)
                  | otherwise = fail
 
-      
+
 
 kmp :: Eq a => [a] -> [a] -> Bool
 kmp super sub = done . drive super $ machine
-    where 
+    where
       machine = table sub (KMP False (const machine))
       drive [] m = m
       drive (x:xs) m = drive xs (next m x)
@@ -107,15 +107,15 @@ mergeF ((a, b), g) a' | a == a' = b
 
 iso1 :: Iso' (a -> b, a -> c) (a -> (b, c))
 iso1 = iso f g
-    where 
+    where
       f (h, h') a = (h a, h' a)
       g h = (fst . h, snd . h)
 
 
 
 avg :: Int -> [Float] -> [Float]
-avg b = map getAvg . tail . scanl f def 
-    where 
+avg b = map getAvg . tail . scanl f def
+    where
       getAvg (x, n, _) = x/fi n
       def = (0, 0, [])
       f :: (Float, Int, [Float]) -> Float -> (Float, Int, [Float])
@@ -152,11 +152,11 @@ accumStrings f = fmap snd . runWriterT . runMaybeT . forever $ do
   if null x
      then MaybeT (return Nothing)
      else
-     	  tell [x]
+          tell [x]
 
 rotateByN :: forall a. Int -> [a] -> [a]
 rotateByN r ol = map snd l'
-    where 
+    where
       l' :: [(a, a)]
       l' =  eval list
       len = length ol
@@ -164,7 +164,7 @@ rotateByN r ol = map snd l'
       list = map g [0..len-1]
       g :: Int -> [(a, a)] -> (a, a)
       g i l = (ol !! i, fst (l !! ((i + r) `mod` len)))
-      
+
 
 
 
@@ -180,3 +180,6 @@ randomStream r = do
 
 
 tf m x = trace ("Trace " ++ m ++ ":  " ++ show x) x
+
+-- TODO: Create actual special id with special characters
+specialId = "specialId__123"

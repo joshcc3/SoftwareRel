@@ -24,7 +24,7 @@ pipeline inp =
     Left x -> error $ "Could not parse file: " ++ show x
     Right ast -> func ast
 
-func ast = case runState (toIntermediateForm ast) (St' M.empty M.empty) of
+func ast = case runState (toIntermediateForm ast) IS.initSt' of
              (intermProg, _) -> do
                print intermProg
                getLine

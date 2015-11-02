@@ -24,6 +24,8 @@ import Control.Monad.State
 import Control.Monad.Writer
 import qualified Data.Map as M
 import Data.Foldable (foldMap)
+import HSRTool.Utils
+
 type Assumption = NewExpr
 type Pred = Expr
 type M id id' = M.Map id id'
@@ -38,27 +40,22 @@ runStack s = runWriterT . flip runStateT s
 
 
 runSSAGenerator :: Program IntermId (M String IntermId) -> IO (SSA Op IntermId)
-runSSAGenerator (P (Program _ vD pD)) = do
-  print pD
-  o <- runStack initSt pDecls
-  putStrLn $ replicate 80 '-'
-  print o
-  putStrLn $ replicate 80 '-'
-  return (snd o)
-    where
-      initSt = St (NE (ELit 1))
-      pDecls = toSSA (S (SBlockStmt (Either' (Left M.empty), Either' (Right M.empty))
-                                  (pD >>= _pStmts))) (ELit 1)
+runSSAGenerator prog
+    = case prog of
+        (P (Program _ vD pD)) -> do
+                            print pD
+                            o <- runStack initSt pDecls
+                            putStrLn $ replicate 80 '-'
+                            -- print o
+                            putStrLn $ replicate 80 '-'
+                            return (snd o)
+                                 where
+                                   initSt = St (NE (ELit 1))
+                                   pDecls = toSSA (S (SBlockStmt (Either' (Left M.empty), Either' (Right M.empty))
+                                                      (pD >>= _pStmts))) (ELit 1)
 
 
 type SSAEval id = StateT (St id) (WriterT (SSA Op id) IO)
-
-genStat (PPReq _ e) = Left (S (SAssumeStmt (AssumeStmt () e)))
-genStat (PPEns _ e) = Right (S (SAssertStmt (AssertStmt () e)))
-transProg = pPDecls.traverse %~ g
-    where
-      g p = case partitionEithers (map genStat (_pPrepost p)) of
-              (ls, rs) -> p & pStmts %~ (ls ++) . (++ rs)
 
 toSSA :: Stmt IntermId (M String IntermId) -> Pred Op IntermId -> SSAEval IntermId ()
 toSSA (S (SAssignStmt (AssignStmt _ v e))) p = tell [SSAAssign v (NE e)]
