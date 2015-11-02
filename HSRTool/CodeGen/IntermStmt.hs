@@ -72,6 +72,8 @@ closeScope = do
 updateId :: (IntermId, Int) -> IntermId
 updateId (id, n) = id&countIntermId .~ Just n
 
+
+
 {- |
      Updates the definition for varId in the map to reflect a
      Havoc/Assign statement
@@ -80,14 +82,16 @@ updateState :: String -> State St' Mp
 updateState varId = do
   cm <- _countMap <$> get
   m <- _mp <$> get
-  let curCount = maybe 1 id (M.lookup varId cm)
+  let curCount = maybe initialSSAId id (M.lookup varId cm) -- TODO: Add a better way to synchronize the maps
       curId = maybe (undefVarErr varId) id (SM.lookup varId m)
       newId = updateId (curId, curCount)
   mp .= SM.updateDef m varId newId
   countMap %= M.insertWith (+) varId 1
   _mp <$> get
 
-newDefVal id = IntermId id (Just 0)
+initialSSAId = 0
+
+newDefVal id = IntermId id (Just initialSSAId)
 
 {- |
      The following helper functions annotate each info node in the

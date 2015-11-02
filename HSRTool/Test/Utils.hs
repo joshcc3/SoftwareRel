@@ -12,7 +12,7 @@ ifP = "if.c"
 ifelseP = "ifelse.c"
 overshiftP = "overshift.c"
 simpleeqP = "simpleeq.c"
-simplelorP = "simplelor.c" 
+simplelorP = "simplelor.c"
 simplesubP = "simplesub.c"
 
 assertfalseP' = "assertfalse.c"
@@ -23,7 +23,10 @@ failsimpleeqP' = "failsimpleeq.c"
 failsimplelorP' = "failsimplelor.c"
 failsimplesubP' = "failsimplesub.c" -- Parser breaks
 
+simpleP = "simple.c"
+
 correctPrefix = "tests/correct"
 incorrectPrefix = "tests/incorrect"
+mytestPrefix = "tests/mytest"
 (</>) a b = concat [a, "/", b]
 runParserTest p = readFile p >>= return . parse

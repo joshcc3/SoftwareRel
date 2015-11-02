@@ -54,3 +54,4 @@ trans2 = fmap (bimap f g)
 
 correctInputFile x = readFile (correctPrefix </> x)
 incorrectInputFile x = readFile (incorrectPrefix </> x)
+myInputFile x = readFile (mytestPrefix </> x)
