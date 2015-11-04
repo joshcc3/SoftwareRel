@@ -43,11 +43,11 @@ runSSAGenerator :: Program IntermId (M String IntermId) -> IO (SSA Op IntermId)
 runSSAGenerator prog
     = case prog of
         (P (Program _ vD pD)) -> do
-                            print pD
+                            --print pD
                             o <- runStack initSt pDecls
-                            putStrLn $ replicate 80 '-'
+                            --putStrLn $ replicate 80 '-'
                             -- print o
-                            putStrLn $ replicate 80 '-'
+                            --putStrLn $ replicate 80 '-'
                             return (snd o)
                                  where
                                    initSt = St (NE (ELit 1))

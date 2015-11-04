@@ -51,14 +51,14 @@ fromSSA ssa =
     , "(define-fun tobool ((p (_ BitVec 32))) Bool"
     , "     (ite (= p (_ bv0 32)) false true))"
     , ""
-    , "(define-fun mysdiv ((l (_ BitVec 32))) ((r (_ BitVec 32))) (_ BitVec 32)"
+    , "(define-fun mysdiv ((l (_ BitVec 32)) (r (_ BitVec 32))) (_ BitVec 32)"
     , "     (ite (= r (_ bv0 32)) l (bvsdiv l r)))"
-    , "(define-fun mysmod ((l (_ BitVec 32))) ((r (_ BitVec 32))) (_ BitVec 32)"
+    , "(define-fun mysmod ((l (_ BitVec 32)) (r (_ BitVec 32))) (_ BitVec 32)"
     , "     (ite (= r (_ bv0 32)) l (bvsmod l r)))"
-    , "(define-fun myshl ((l (_ BitVec 32))) ((r (_ BitVec 32))) (_ BitVec 32)"
-    , "     (ite (or (>= r (_ bv32 32)) (< r (_ bv0 32))) l (bvshl l r)))"
-    , "(define-fun myashr ((l (_ BitVec 32))) ((r (_ BitVec 32))) (_ BitVec 32)"
-    , "     (ite (or (>= r (_ bv32 32)) (< r (_ bv0 32))) l (bvashr l r)))"
+    , "(define-fun myshl ((l (_ BitVec 32)) (r (_ BitVec 32))) (_ BitVec 32)"
+    , "     (ite (or (bvsge r (_ bv32 32)) (bvslt r (_ bv0 32))) l (bvshl l r)))"
+    , "(define-fun myashr ((l (_ BitVec 32)) (r (_ BitVec 32))) (_ BitVec 32)"
+    , "     (ite (or (bvsge r (_ bv32 32)) (bvslt r (_ bv0 32))) l (bvashr l r)))"
     , ""
     ] ++
 
@@ -72,7 +72,7 @@ fromSSA ssa =
     [""] ++
 
     -- assertions
-    [ "(asserts (not" ] ++
+    [ "(assert (not" ] ++
     map ("(and " ++) asserts ++
     [ "true"
     , replicate (length asserts) ')'
@@ -184,5 +184,5 @@ fromBoolBinOp :: String -> BvSMT -> BvSMT -> BvSMT
 fromBoolBinOp funcSmt lBvSmt rBvSmt =
     fromBoolToBvSmt boolSmt
     where
-        (lBoolSmt, rBoolSmt) = fmap fromBvToBoolSmt (lBvSmt, rBvSmt)
+        [lBoolSmt, rBoolSmt] = fmap fromBvToBoolSmt [lBvSmt, rBvSmt]
         boolSmt = apply2FuncSmt funcSmt lBoolSmt rBoolSmt

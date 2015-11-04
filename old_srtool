@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# java -cp .:antlr-4.5.1-complete.jar tool.SRTool $@
+ghc -o srtool HSRTool/Main.hs

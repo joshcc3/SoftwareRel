@@ -18,7 +18,7 @@ import Data.Maybe
 
 type FileContent = String
 
-pipeline :: FileContent -> IO ()
+pipeline :: FileContent -> IO ([String])
 pipeline inp =
   case (parse inp) of
     Left x -> error $ "Could not parse file: " ++ show x
@@ -26,13 +26,14 @@ pipeline inp =
 
 func ast = case runState (toIntermediateForm ast) IS.initSt' of
              (intermProg, _) -> do
-               print intermProg
-               getLine
-               ssa <-  runSSAGenerator (trans1 intermProg)
-               mapM_ print ssa
-               getLine
+               --print intermProg
+               --getLine
+               ssa <- runSSAGenerator (trans1 intermProg)
+               --mapM_ print ssa
+               --getLine
                let serializedSSA = fromSSA (trans2 ssa)
-               mapM_ putStrLn serializedSSA
+               --mapM_ putStrLn serializedSSA
+               return serializedSSA
 
 s = [ S (SIfStmt (Either' (Left (Either' (Left ((),(),(),()))))) (ELit 1) [] Nothing)]
 
