@@ -30,7 +30,7 @@ leftAssoc
 -}
 
 tokeniseExpr :: Stream String Identity Char => P u [InToken String]
-tokeniseExpr = g 0
+tokeniseExpr = g 0 >>= \x -> return (ITLParen:x ++ [ITRParen])
     where
       g 0 = (try rparen *> fail "")
             <|> ((:) <$> try lparen <*> g 1)
@@ -77,7 +77,42 @@ mapOps ":" = SIfAlt
 
 -- Need to add better error messages here
 -- parseExpr :: P u (Expr String)
-parseExpr = tokeniseExpr >>= toRPN >>= fmap (head . fst) . go []
+parseExpr = tokeniseExpr >>= return . convertSignOps >>= toRPN >>= fmap (head . fst) . go []
+    where
+      go l [] = return (l, [])
+      go l (OutVal i:r) = go (ELit i:l) r
+      go l (OutVar id:r) = go (EID id:l) r
+      go l (OutResult:r) = go (EID specialId:l) r
+      go l (OutOld id:r) = go (EOld id:l) r
+      go [] (OutOp op:r) = error "Bad input expression"
+      go [e1] (OutOp op:r) = either
+                             (\_ ->  fail "Bad Expr")
+                             (\_ -> go (EUnOp op (UnOp e1):[]) r)
+                             (opType $ opInfo op)
+      go (e2:e1:es) (OutOp op:r)
+          = either
+            (\_ -> go (EBinOp op (Pair e1 e2):es) r)
+            (\_ -> go (EUnOp op (UnOp e2):e1:es) r)
+            (opType $ opInfo op)
+
+convertSignOps :: [InToken id] -> [InToken id]
+convertSignOps [] = []
+convertSignOps [x] = [x]
+convertSignOps (a:ITOp Sub:r) | negCase a = a:convertSignOps (ITOp Neg:r)
+                           | otherwise = a:convertSignOps (ITOp Sub:r)
+                           where 
+                             negCase (ITOp _) = True
+                             negCase (ITLParen) = True
+                             negCase _ = False
+convertSignOps (a:ITOp Add:r) | negCase a = convertSignOps (a:r)
+                           | otherwise = a:convertSignOps (ITOp Add:r)
+                           where 
+                             negCase (ITOp _) = True
+                             negCase (ITLParen) = True
+                             negCase _ = False
+convertSignOps (a:r) = a:convertSignOps r
+
+parseExpr' x = return x >>= toRPN >>= fmap (head . fst) . go []
     where
       go l [] = return (l, [])
       go l (OutVal i:r) = go (ELit i:l) r
@@ -113,6 +148,7 @@ instance Show (OutToken String) where
 
 opInfo :: Op -> OpInfo
 opInfo = \case
+    Neg -> OpInfo 15 "-" (Right ())
     LNot -> OpInfo 15 "!" (Right ())
     BitNot -> OpInfo 15 "~" (Right ())
     Mul -> OpInfo 14 "*" (Left ())
@@ -140,6 +176,7 @@ opInfo = \case
 
 prec = precedence . opInfo
 leftAssoc LNot = False
+leftAssoc Neg = False
 leftAssoc BitNot = False
 leftAssoc SIfCond = False
 leftAssoc SIfAlt = False

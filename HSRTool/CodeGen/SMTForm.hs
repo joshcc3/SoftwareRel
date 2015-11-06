@@ -146,7 +146,10 @@ fromExpr (EID id) =
     where
         idSMT = newIdToIdSMT id
 --fromExpr EResult | TODO
---fromExpr EOld
+fromExpr (EOld id) =
+    (idSMT, Set.singleton idSMT)
+        where 
+          idSMT = newIdToIdSMT (NewId 0 (id ++ "0"))
 
 fromBinOp :: Op -> BvSMT -> BvSMT -> BvSMT
 fromBinOp Add = apply2FuncSmt "bvadd"
@@ -176,7 +179,7 @@ pipeBoolInBvSmt = (.) . (.)
 fromUnOp :: Op -> BvSMT -> BvSMT
 fromUnOp LNot =  fromBoolToBvSmt . applyFuncSmt "not" . fromBvToBoolSmt
 fromUnOp BitNot = applyFuncSmt "bvnot"
--- fromBinOp Not = TODO
+fromUnOp Neg = fromBinOp Sub (fst $ fromExpr (ELit 0)) 
 --fromBinOp SIfCond = apply2FuncSmt ""
 --fromBinOp SIfAlt = apply2FuncSmt ""
 

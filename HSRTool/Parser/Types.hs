@@ -81,7 +81,7 @@ instance Comonad ZList where
 
 type ASTInfo = ()
 
-data Op = Mul | Div | Add | Sub | Mod | LShift | RShift |
+data Op = Neg | Mul | Div | Add | Sub | Mod | LShift | RShift |
           BitXOr | BitAnd | BitOr | GrEq | Gr | Lt | LtEq | NEq |
           Eq | Not | BitNot | LAnd | LOr | LNot | SIfCond | SIfAlt
           deriving (Show, Eq, Read, Ord)
@@ -97,7 +97,7 @@ data Expr op id = EShortIf (Expr op id) (Expr op id) (Expr op id) |
                   ELit Int |
                   EID id |
                   EResult |
-                  EOld id deriving (Eq, Ord, Show, Read, Functor)
+                  EOld String deriving (Eq, Ord, Show, Read, Functor)
 makePrisms ''Expr
 makeLenses ''Expr
 
@@ -504,7 +504,7 @@ instance Bifoldable Expr where
   bifoldMap _ _ (ELit n) = mempty
   bifoldMap f g (EID id) = g id
   bifoldMap _ _ EResult = mempty
-  bifoldMap f g (EOld id) = g id
+  bifoldMap f g (EOld id) = mempty
 
 instance Traversable (Expr op) where
   traverse = bitraverse pure
@@ -517,7 +517,7 @@ instance Bifunctor Expr where
   bimap f g (ELit x) = ELit x
   bimap f g (EID id) = EID (g id)
   bimap f g EResult = EResult
-  bimap f g (EOld id) = EOld (g id)
+  bimap f g (EOld id) = EOld id
 
 instance Bitraversable Expr where
   bitraverse f g (EShortIf b e e') = EShortIf <$> bitraverse f g b <*> bitraverse f g e <*> bitraverse f g e'
@@ -526,7 +526,7 @@ instance Bitraversable Expr where
   bitraverse _ _ (ELit n) = pure (ELit n)
   bitraverse _ g (EID id) = EID <$> g id
   bitraverse _ _ EResult = pure EResult
-  bitraverse _ g (EOld id) = EOld <$> (g id)
+  bitraverse _ g (EOld id) = pure (EOld id)
 
 instance Monad (Expr op) where
    return = EID
@@ -536,7 +536,7 @@ instance Monad (Expr op) where
    ELit x >>= f = ELit x
    EID id >>= f = f id
    EResult >>= _ = EResult
-   EOld id >>= f = f id
+   EOld id >>= _ = EOld id
 
 instance Applicative (Expr op) where
     pure = return

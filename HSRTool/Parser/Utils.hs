@@ -106,3 +106,4 @@ integrate = distribute .
             fmap (appEndo . getDual) . 
             scanlC . 
             fmap (Dual . Endo)
+
